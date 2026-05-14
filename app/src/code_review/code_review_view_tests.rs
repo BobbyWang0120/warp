@@ -258,6 +258,7 @@ impl TestContext {
 
         let editor = create_editor_with_content(app, editor_content);
         let repo_path = PathBuf::from("/repo");
+        let repo_key = LocalOrRemotePath::Local(repo_path.clone());
 
         let (window_id, _) = app.add_window(WindowStyle::NotStealFocus, |_| TestView);
         let state =

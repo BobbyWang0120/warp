@@ -179,7 +179,6 @@ fn create_find_model_with_query(
 
     let diff_state_model = app.add_model(DiffStateModel::new_for_test);
     let repo_path = PathBuf::from("/tmp/test");
-    let repo_key = LocalOrRemotePath::Local(repo_path);
     let working_directories_model = app.add_model(|_| WorkingDirectoriesModel::new());
     let repo_key = LocalOrRemotePath::Local(repo_path);
     let code_review_comment_batch =

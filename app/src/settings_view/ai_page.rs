@@ -6843,28 +6843,39 @@ impl SettingsWidget for CloudHandoffWidget {
             ));
 
         if ai_settings.is_cloud_handoff_enabled(app) {
-            let auto_handoff_on_sleep_toggle = ui_builder
-                .switch(self.auto_handoff_on_sleep_toggle.clone())
-                .check(*ai_settings.auto_handoff_on_sleep_enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::ToggleAutoHandoffOnSleep);
-                })
-                .finish();
+            if ai_settings
+                .auto_handoff_on_sleep_enabled
+                .is_supported_on_current_platform()
+            {
+                let auto_handoff_on_sleep_toggle = ui_builder
+                    .switch(self.auto_handoff_on_sleep_toggle.clone())
+                    .check(*ai_settings.auto_handoff_on_sleep_enabled)
+                    .build()
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(AISettingsPageAction::ToggleAutoHandoffOnSleep);
+                    })
+                    .finish();
 
-            let auto_handoff_on_sleep_row = build_toggle_element(
-                render_body_item_label::<AISettingsPageAction>(
-                    "Auto handoff on sleep".to_string(),
-                    Some(styles::header_font_color(true, app)),
-                    None,
-                    LocalOnlyIconState::Hidden,
-                    ToggleState::Enabled,
+                let auto_handoff_on_sleep_row = build_toggle_element(
+                    render_body_item_label::<AISettingsPageAction>(
+                        "Auto handoff on sleep".to_string(),
+                        Some(styles::header_font_color(true, app)),
+                        None,
+                        LocalOnlyIconState::Hidden,
+                        ToggleState::Enabled,
+                        appearance,
+                    ),
+                    auto_handoff_on_sleep_toggle,
                     appearance,
-                ),
-                auto_handoff_on_sleep_toggle,
-                appearance,
-                None,
-            );
+                    None,
+                );
+                column.add_child(auto_handoff_on_sleep_row);
+                column.add_child(render_ai_setting_description(
+                    "Automatically hand off the most recently focused running local agent conversation when macOS is about to sleep.",
+                    true,
+                    app,
+                ));
+            }
             let ampersand_toggle = ui_builder
                 .switch(self.ampersand_toggle.clone())
                 .check(!*ai_settings.should_force_disable_ampersand_handoff)
@@ -6887,12 +6898,6 @@ impl SettingsWidget for CloudHandoffWidget {
                 appearance,
                 None,
             );
-            column.add_child(auto_handoff_on_sleep_row);
-            column.add_child(render_ai_setting_description(
-                "Automatically hand off the most recently focused running local agent conversation when macOS is about to sleep.",
-                true,
-                app,
-            ));
 
             column.add_child(ampersand_row);
             column.add_child(render_ai_setting_description(

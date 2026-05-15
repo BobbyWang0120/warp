@@ -95,6 +95,12 @@ impl VerticalTabsPaneContextMenuTarget {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoCloudHandoffTrigger {
+    MacOsSleep,
+    Uri,
+}
+
 #[derive(Debug, Clone)]
 pub enum WorkspaceAction {
     ActivateTab(usize),
@@ -496,6 +502,12 @@ pub enum WorkspaceAction {
         launch: Option<()>,
         environment_id: Option<crate::server::ids::SyncId>,
         entry_point: crate::ai::ambient_agents::telemetry::HandoffEntryPoint,
+    },
+    /// Automatically hand off the active running local agent conversation in the
+    /// given terminal view to Cloud Mode.
+    AutoHandoffActiveAgentToCloud {
+        terminal_view_id: EntityId,
+        trigger: AutoCloudHandoffTrigger,
     },
     /// Show the environment creation modal during `&` handoff compose when no
     /// environments exist.
@@ -959,6 +971,7 @@ impl WorkspaceAction {
             | OpenSettingsFile
             | FixSettingsWithOz { .. }
             | OpenLocalToCloudHandoffPane { .. }
+            | AutoHandoffActiveAgentToCloud { .. }
             | ShowHandoffEnvironmentCreationModal
             | ShowCloudModeV2EnvironmentCreationModal
             | OpenNetworkLogPane => false,

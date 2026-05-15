@@ -1538,14 +1538,9 @@ impl CodeReviewView {
             return Vec::new();
         };
 
-        let (current_mode, current_branch_name, snapshot_main_branch) =
-            self.diff_state_model.read(ctx, |model, ctx| {
-                (
-                    model.diff_mode(ctx),
-                    model.get_current_branch_name(ctx),
-                    model.get_main_branch_name(ctx),
-                )
-            });
+        let (current_mode, current_branch_name) = self.diff_state_model.read(ctx, |model, ctx| {
+            (model.diff_mode(ctx), model.get_current_branch_name(ctx))
+        });
 
         let mut targets = Vec::new();
 

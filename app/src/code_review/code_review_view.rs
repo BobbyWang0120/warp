@@ -1573,22 +1573,10 @@ impl CodeReviewView {
         }
 
         // 3. Main branch, if known.
-        //
-        // For local repos, `available_branches` is populated by
-        // `fetch_branches_and_setup_dropdown` (a local `git for-each-ref`).
-        // For remote repos, that fetch is currently gated as LOCAL-ONLY
-        // (full remote branch picker is a follow-up); fall back to the main
-        // branch name surfaced by the diff-state model's metadata snapshot
-        // so the diff selector still shows "Changes vs. <main>".
-        let main_branch_name = repo
-            .available_branches
-            .iter()
-            .find(|(_, is_main)| *is_main)
-            .map(|(name, _)| name.clone())
-            .or(snapshot_main_branch);
-        if let Some(main_branch_name) = main_branch_name {
+        let main_branch = repo.available_branches.iter().find(|entry| entry.is_main);
+        if let Some(main_entry) = main_branch {
             targets.push(DiffTarget::new(
-                main_branch_name,
+                main_entry.name.clone(),
                 DiffMode::MainBranch,
                 matches!(current_mode, DiffMode::MainBranch),
             ));
@@ -1596,10 +1584,9 @@ impl CodeReviewView {
 
         // 4. Other branches, filtered to exclude main and the currently
         // checked-out branch (the latter is functionally the same as
-        // "Uncommitted changes"). For remote repos this list is empty until
-        // the full branch picker follow-up lands.
-        for (branch_name, is_main) in repo.available_branches.iter() {
-            if *is_main {
+        // "Uncommitted changes").
+        for entry in repo.available_branches.iter() {
+            if entry.is_main {
                 continue;
             }
             if let Some(current_name) = &current_branch_name {

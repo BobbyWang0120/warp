@@ -3,15 +3,16 @@ use std::str::FromStr;
 
 use ai::index::full_source_code_embedding::NodeHash;
 use remote_server::codebase_index_proto::{RemoteCodebaseIndexState, RemoteCodebaseIndexStatus};
-use warp_core::HostId;
+use warp_core::{HostId, SessionId};
 use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::blocklist::SessionContext;
-use crate::features::FeatureFlag;
-use crate::settings::CodeSettings;
-use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::ai::codebase_auto_indexing::{
+    auto_index_candidate_roots, should_auto_index_codebase, CodebaseAutoIndexingSurface,
+};
+use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 use super::manager::{
     RemoteCodebaseIndexMutationKind, RemoteCodebaseIndexStatusWithPath, RemoteServerManager,
@@ -83,6 +84,12 @@ pub struct RemoteCodebaseIndexModel {
     statuses: HashMap<RemotePath, RemoteCodebaseIndexStatus>,
     active_repos_by_host: HashMap<HostId, RemotePath>,
     host_labels: HashMap<HostId, String>,
+    // Local settings-change auto-indexing replays all active terminal working
+    // directories. Remote sessions on the same host can be in different git
+    // repos, so track daemon-resolved git roots per session and let the shared
+    // auto-index candidate helper dedupe paths before requesting indexing.
+    active_git_repos_by_session: HashMap<SessionId, RemotePath>,
+    last_git_repos_by_host: HashMap<HostId, RemotePath>,
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +109,13 @@ impl RemoteCodebaseIndexModel {
         let manager = RemoteServerManager::handle(ctx);
         ctx.subscribe_to_model(&manager, |me, event, ctx| {
             me.handle_remote_server_manager_event(event, ctx);
+        });
+
+        let user_workspaces = UserWorkspaces::handle(ctx);
+        ctx.subscribe_to_model(&user_workspaces, |me, event, ctx| {
+            if let UserWorkspacesEvent::CodebaseContextEnablementChanged = event {
+                me.handle_codebase_context_enablement_changed(ctx);
+            }
         });
         Self::default()
     }
@@ -242,13 +256,13 @@ impl RemoteCodebaseIndexModel {
                 }
             }
             RemoteServerManagerEvent::NavigatedToDirectory {
-                session_id: _,
+                session_id,
                 remote_path,
                 is_git,
             } => {
-                self.record_navigated_directory(remote_path);
+                self.record_navigated_directory(*session_id, remote_path, *is_git);
                 if *is_git
-                    && should_auto_index_remote_codebase(ctx)
+                    && should_auto_index_codebase(CodebaseAutoIndexingSurface::Remote, ctx)
                     && self.should_request_auto_index_for_navigated_git_repo(remote_path)
                 {
                     // Mirrors local auto-indexing: remote navigation silently requests indexing
@@ -282,10 +296,12 @@ impl RemoteCodebaseIndexModel {
                     ctx.emit(RemoteCodebaseIndexModelEvent::SettingsEntriesChanged);
                 }
             }
+            RemoteServerManagerEvent::SessionDisconnected { session_id, .. }
+            | RemoteServerManagerEvent::SessionDeregistered { session_id } => {
+                self.clear_active_git_repo_for_session(*session_id);
+            }
             RemoteServerManagerEvent::SessionConnecting { .. }
             | RemoteServerManagerEvent::SessionConnectionFailed { .. }
-            | RemoteServerManagerEvent::SessionDisconnected { .. }
-            | RemoteServerManagerEvent::SessionDeregistered { .. }
             | RemoteServerManagerEvent::HostConnected { .. }
             | RemoteServerManagerEvent::RepoMetadataSnapshot { .. }
             | RemoteServerManagerEvent::RepoMetadataUpdated { .. }
@@ -319,13 +335,36 @@ impl RemoteCodebaseIndexModel {
         }
     }
 
+    fn handle_codebase_context_enablement_changed(&mut self, ctx: &mut ModelContext<Self>) {
+        if !should_auto_index_codebase(CodebaseAutoIndexingSurface::Remote, ctx) {
+            return;
+        }
+
+        for remote_path in self.active_git_repo_paths_needing_auto_index() {
+            RemoteServerManager::handle(ctx).update(ctx, |manager, ctx| {
+                manager.ensure_codebase_indexed(
+                    remote_path,
+                    RemoteCodebaseIndexMutationKind::AutoIndex,
+                    ctx,
+                );
+            });
+        }
+    }
+
+    fn active_git_repo_paths_needing_auto_index(&self) -> Vec<RemotePath> {
+        auto_index_candidate_roots(
+            self.active_git_repos_by_session.values().cloned(),
+            |remote_path| self.should_request_auto_index_for_navigated_git_repo(remote_path),
+        )
+    }
+
     fn apply_statuses_snapshot(
         &mut self,
         host_id: &HostId,
         statuses: &[RemoteCodebaseIndexStatusWithPath],
     ) -> bool {
         let status_count = statuses.len();
-        log::debug!(
+        log::info!(
             "[Remote codebase indexing] Client received bootstrap codebase index statuses snapshot: host_id={host_id} status_count={status_count}"
         );
         for status_with_path in statuses {
@@ -375,10 +414,11 @@ impl RemoteCodebaseIndexModel {
         remote_path: RemotePath,
         status: RemoteCodebaseIndexStatus,
     ) -> bool {
-        if self.statuses.get(&remote_path) == Some(&status) {
+        let changed = self.statuses.get(&remote_path) != Some(&status);
+        if !changed {
             return false;
         }
-        log::debug!(
+        log::info!(
             "[Remote codebase indexing] Client applying codebase index status update: host_id={} repo_path={} state={:?} has_root_hash={} embedding_config={:?}",
             remote_path.host_id,
             status.repo_path,
@@ -392,9 +432,26 @@ impl RemoteCodebaseIndexModel {
         true
     }
 
-    fn record_navigated_directory(&mut self, remote_path: &RemotePath) {
+    fn record_navigated_directory(
+        &mut self,
+        session_id: SessionId,
+        remote_path: &RemotePath,
+        is_git: bool,
+    ) {
         self.active_repos_by_host
             .insert(remote_path.host_id.clone(), remote_path.clone());
+        if is_git {
+            self.active_git_repos_by_session
+                .insert(session_id, remote_path.clone());
+            self.last_git_repos_by_host
+                .insert(remote_path.host_id.clone(), remote_path.clone());
+        } else {
+            self.active_git_repos_by_session.remove(&session_id);
+        }
+    }
+
+    fn clear_active_git_repo_for_session(&mut self, session_id: SessionId) {
+        self.active_git_repos_by_session.remove(&session_id);
     }
 
     fn record_host_label(&mut self, host_id: &HostId, ctx: &mut ModelContext<Self>) -> bool {
@@ -426,6 +483,9 @@ impl RemoteCodebaseIndexModel {
             }
         }
         self.active_repos_by_host.remove(host_id);
+        self.active_git_repos_by_session
+            .retain(|_, remote_path| remote_path.host_id != *host_id);
+        self.last_git_repos_by_host.remove(host_id);
         updated
     }
 
@@ -478,17 +538,40 @@ impl RemoteCodebaseIndexModel {
             return explicit_remote_path;
         }
 
-        if let Some(remote_path) = self.active_repos_by_host.get(host_id) {
-            // Remote branch: only implicit searches (no `codebase_path`) fall back to the active
-            // repo recorded by daemon navigation events.
-            return Some(remote_path.clone());
-        }
-
         if let Some((remote_path, _)) =
             current_working_directory.and_then(|cwd| self.best_status_for_path(host_id, cwd))
         {
             // Remote branch: if the remote cwd is inside a known indexed repo, use the indexed root
             // rather than re-indexing the nested directory.
+            return Some(remote_path.clone());
+        }
+        if let Some(remote_path) = self.active_repos_by_host.get(host_id) {
+            if self.status_for_repo(remote_path).is_some() {
+                // Remote branch: only implicit searches (no `codebase_path`) fall back to the
+                // active repo recorded by daemon navigation events.
+                return Some(remote_path.clone());
+            }
+        }
+
+        if let Some(remote_path) = self.last_git_repo_for_context(
+            host_id,
+            current_working_directory,
+            self.active_repos_by_host
+                .get(host_id)
+                .map(|remote_path| remote_path.path.as_str()),
+        ) {
+            return Some(remote_path);
+        }
+
+        if let Some((remote_path, _)) = current_working_directory
+            .and_then(|cwd| self.single_descendant_status_for_path(host_id, cwd))
+        {
+            return Some(remote_path.clone());
+        }
+
+        if let Some(remote_path) = self.active_repos_by_host.get(host_id) {
+            // Remote branch: only implicit searches (no `codebase_path`) fall back to the active
+            // repo recorded by daemon navigation events.
             return Some(remote_path.clone());
         }
 
@@ -498,6 +581,20 @@ impl RemoteCodebaseIndexModel {
             // resolve search roots in the local `SearchCodebase` executor branch instead.
             remote_path_from_repo_path(host_id, cwd)
         })
+    }
+    fn resolve_known_remote_repo_path(
+        &self,
+        host_id: &HostId,
+        current_working_directory: Option<&str>,
+        requested_codebase_path: Option<&str>,
+    ) -> Option<RemotePath> {
+        let remote_path = self.resolve_remote_repo_path(
+            host_id,
+            current_working_directory,
+            requested_codebase_path,
+        )?;
+        self.status_for_repo(&remote_path)?;
+        Some(remote_path)
     }
 
     fn status_for_repo(&self, remote_path: &RemotePath) -> Option<&RemoteCodebaseIndexStatus> {
@@ -514,6 +611,39 @@ impl RemoteCodebaseIndexModel {
             .iter()
             .filter(|(key, _)| key.host_id == *host_id && path.starts_with(&key.path))
             .max_by_key(|(remote_path, _)| remote_path.path.as_str().len())
+    }
+
+    fn single_descendant_status_for_path(
+        &self,
+        host_id: &HostId,
+        path: &str,
+    ) -> Option<(&RemotePath, &RemoteCodebaseIndexStatus)> {
+        let path = StandardizedPath::try_new(path).ok()?;
+        let mut descendants = self
+            .statuses
+            .iter()
+            .filter(|(key, _)| key.host_id == *host_id && key.path.starts_with(&path));
+        let descendant = descendants.next()?;
+        descendants.next().is_none().then_some(descendant)
+    }
+
+    fn last_git_repo_for_context(
+        &self,
+        host_id: &HostId,
+        current_working_directory: Option<&str>,
+        active_repo_path: Option<&str>,
+    ) -> Option<RemotePath> {
+        let remote_path = self.last_git_repos_by_host.get(host_id)?;
+        let repo_path = &remote_path.path;
+        let is_related_to_context = current_working_directory
+            .and_then(|cwd| StandardizedPath::try_new(cwd).ok())
+            .is_some_and(|cwd| cwd.starts_with(repo_path) || repo_path.starts_with(&cwd))
+            || active_repo_path
+                .and_then(|active_path| StandardizedPath::try_new(active_path).ok())
+                .is_some_and(|active_path| {
+                    active_path.starts_with(repo_path) || repo_path.starts_with(&active_path)
+                });
+        is_related_to_context.then(|| remote_path.clone())
     }
 }
 
@@ -559,23 +689,6 @@ fn search_availability_for_status(
                 .unwrap_or_else(|| "Remote codebase search is not available.".to_string()),
         },
     }
-}
-
-fn should_auto_index_remote_codebase(ctx: &mut ModelContext<RemoteCodebaseIndexModel>) -> bool {
-    remote_codebase_auto_indexing_enabled(
-        UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx),
-        *CodeSettings::as_ref(ctx).auto_indexing_enabled,
-    )
-}
-
-fn remote_codebase_auto_indexing_enabled(
-    codebase_context_enabled: bool,
-    auto_indexing_enabled: bool,
-) -> bool {
-    FeatureFlag::RemoteCodebaseIndexing.is_enabled()
-        && FeatureFlag::FullSourceCodeEmbedding.is_enabled()
-        && codebase_context_enabled
-        && auto_indexing_enabled
 }
 
 #[cfg(test)]

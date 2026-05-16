@@ -322,51 +322,6 @@ fn test_from_conversation_populates_local_conversation_fields() {
     });
 }
 
-/// `ConversationDetailsData::from_task` must source the primary panel title
-/// from the task's `display_name()` so the side pane shows the orchestrator
-/// short name (`name`) when present. The descriptive `title` is recoverable
-/// via `task.title` elsewhere; `source_prompt` keeps the raw prompt verbatim.
-#[test]
-fn test_from_task_uses_orchestrator_short_name_as_panel_title() {
-    App::test((), |mut app| async move {
-        let _history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
-
-        let mut task = create_test_task("550e8400-e29b-41d4-a716-000000004040");
-        task.name = Some("frontend-tests".to_string());
-        task.title = "Implement React component test coverage".to_string();
-        task.prompt = "Add unit tests for the cart components".to_string();
-
-        app.update(|ctx| {
-            let data = ConversationDetailsData::from_task(&task, None, None, ctx);
-            assert_eq!(data.title, "frontend-tests");
-            assert_eq!(
-                data.source_prompt.as_deref(),
-                Some("Add unit tests for the cart components"),
-                "source prompt should remain the raw user-supplied prompt"
-            );
-        });
-    });
-}
-
-/// When no orchestrator-supplied `name` is present, the panel title falls back
-/// to the descriptive `title` field. This is the back-compat path that older
-/// server responses (and tasks created outside an orchestrator) hit.
-#[test]
-fn test_from_task_panel_title_falls_back_to_title_when_name_missing() {
-    App::test((), |mut app| async move {
-        let _history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
-
-        let mut task = create_test_task("550e8400-e29b-41d4-a716-000000004041");
-        task.name = None;
-        task.title = "Implement React component test coverage".to_string();
-
-        app.update(|ctx| {
-            let data = ConversationDetailsData::from_task(&task, None, None, ctx);
-            assert_eq!(data.title, "Implement React component test coverage");
-        });
-    });
-}
-
 #[test]
 fn test_from_task_includes_linked_directory_when_server_token_matches() {
     App::test((), |mut app| async move {

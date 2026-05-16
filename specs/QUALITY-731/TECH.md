@@ -47,14 +47,15 @@ Change `OrchestrationViewerModel::apply_children_fetch` in `app/src/terminal/sha
    - A task with `name = None` falls back to `title`.
    - A task with empty/whitespace `name` falls back to `title` or `"Agent"`.
 ### Details panel and other task-title surfaces
-Change the side pane path that reads task data directly:
-1. In `ConversationDetailsData::from_task` (`app/src/ai/conversation_details_panel.rs`), set `title` from `task.display_name()` for task records that have a non-empty `name`.
-2. Keep `source_prompt: Some(task.prompt.clone())` unchanged; do not overload the prompt field with `task.title`.
-3. Do not add a new visible secondary title for this bug fix unless product asks for it. The descriptive `task.title` is still retained on `AmbientAgentTask` for older fallback behavior and non-label surfaces, while `ConversationDetailsData.title` becomes the short display label when `name` is present.
-4. Search for other direct `AmbientAgentTask.title` uses in management/detail surfaces and classify them:
-   - Short label surfaces should use `display_name()`.
-   - Long description/search/history surfaces may keep `title`.
-The core viewer bug is fixed when all surfaces that read `AIConversation::agent_name()` are seeded from server `name`, and the task details panel uses `name` when present.
+The conversation details side pane (`ConversationDetailsData::from_task` in `app/src/ai/conversation_details_panel.rs`) is intentionally left on `task.title` for QUALITY-731. Switching this surface to the short orchestrator name is deferred pending product feedback: ultimately the panel may want to show both `name` (as a short header) and `title` (as a descriptive subline), and we should let usage feedback drive that decision rather than guess at the shape now.
+What this means for implementation:
+1. Do not change `ConversationDetailsData::from_task` to use `task.display_name()` as the primary panel title in this change. Leave `title: task.title.clone()` and `source_prompt: Some(task.prompt.clone())` untouched.
+2. Do not add new tests asserting display-name behavior in the details panel as part of this change.
+3. Still add `name: None` to any existing details-panel test fixtures that construct an `AmbientAgentTask` so they compile against the new field.
+Other `AmbientAgentTask.title` call sites should be classified the same way:
+- Short label surfaces (viewer pill bar, hover card, breadcrumb, child status card, transcript participant) use `display_name()` via `AIConversation::agent_name`.
+- Long description/search/history surfaces (`agent_sdk/ambient.rs` CLI table, `data_source.rs` search, `agent_conversations_model/entry.rs` management list, tombstone fallback) keep `title`.
+The core viewer bug is fixed when all surfaces that read `AIConversation::agent_name()` are seeded from server `name`. A future change can revisit the details panel header once product decides whether to show `name`, `title`, or both.
 ## End-to-end flow
 ```mermaid
 flowchart LR
@@ -75,11 +76,11 @@ Unit/client tests:
 - `app/src/terminal/shared_session/viewer/orchestration_viewer_model_tests.rs` for name-vs-title registration and fallback behavior.
 - `app/src/pane_group/pane/local_harness_launch_tests.rs` for threading the name into `create_agent_task`.
 - `app/src/server/server_api/ai_tests.rs` for serialized `SpawnAgentRequest` including `name` when present and omitting it when absent.
-- `app/src/ai/conversation_details_panel_tests.rs` for primary side-pane title preferring `name`.
+- `app/src/ai/conversation_details_panel_tests.rs`: no behavior assertions about `display_name` for this change; only ensure existing fixtures construct `AmbientAgentTask` with `name: None`.
 Manual validation:
 1. Start or load an orchestrated shared session where a child has `name = "frontend-tests"` and a long title.
 2. Open the session as a viewer.
-3. Verify the pill label, hover card participant label, breadcrumb, child status card, transcript participant, and details side pane use `frontend-tests`.
+3. Verify the pill label, hover card participant label, breadcrumb, child status card, and transcript participant all use `frontend-tests`. The conversation details side pane intentionally still shows `task.title` for this change.
 4. Verify the long title remains available as fallback metadata where existing hover/title fallback is used.
 5. Repeat with a child whose `title` is omitted so the server derives title from prompt; verify the UI still shows the short `name`.
 6. Repeat against an older server response without `name`; verify fallback to `title` avoids blank labels.

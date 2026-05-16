@@ -200,7 +200,7 @@ impl CodeSettingsPageView {
             .count();
 
         ctx.subscribe_to_model(&index_manager, |me, index, event, ctx| {
-            if let CodebaseIndexManagerEvent::SyncStateUpdated = event {
+            if let CodebaseIndexManagerEvent::SyncStateUpdated { .. } = event {
                 let codebase_count = index.as_ref(ctx).get_codebase_index_statuses(ctx).count();
 
                 // Only update mouse states if the number of codebases changed

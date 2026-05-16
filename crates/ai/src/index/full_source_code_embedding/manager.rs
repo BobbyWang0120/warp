@@ -92,7 +92,9 @@ pub enum CodebaseIndexManagerEvent {
         retrieval_id: RetrievalID,
         error_message: String,
     },
-    SyncStateUpdated,
+    SyncStateUpdated {
+        root_path: PathBuf,
+    },
     IndexMetadataUpdated {
         root_path: PathBuf,
         event: WorkspaceMetadataEvent,
@@ -100,7 +102,9 @@ pub enum CodebaseIndexManagerEvent {
     RemoveExpiredIndexMetadata {
         expired_metadata: Arc<Vec<PathBuf>>,
     },
-    NewIndexCreated,
+    NewIndexCreated {
+        root_path: PathBuf,
+    },
 }
 
 /// User-facing indexing errors.
@@ -744,7 +748,9 @@ impl CodebaseIndexManager {
         if !self.codebase_indices.contains_key(&directory) {
             self.build_and_sync_codebase_index(BuildSource::FromPath(&directory), ctx);
             // Starting a new codebase index should be considered into sync state updates.
-            ctx.emit(CodebaseIndexManagerEvent::SyncStateUpdated);
+            ctx.emit(CodebaseIndexManagerEvent::NewIndexCreated {
+                root_path: directory,
+            });
         }
     }
 
@@ -943,8 +949,10 @@ impl CodebaseIndexManager {
                 fragments: fragments.clone(),
                 out_of_sync_delay: *out_of_sync_delay,
             }),
-            CodebaseIndexEvent::SyncStateUpdated => {
-                ctx.emit(CodebaseIndexManagerEvent::SyncStateUpdated)
+            CodebaseIndexEvent::SyncStateUpdated { root_path } => {
+                ctx.emit(CodebaseIndexManagerEvent::SyncStateUpdated {
+                    root_path: root_path.to_path_buf(),
+                })
             }
             CodebaseIndexEvent::IndexMetadataUpdated { root_path, event } => {
                 ctx.emit(CodebaseIndexManagerEvent::IndexMetadataUpdated {

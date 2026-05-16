@@ -18,7 +18,7 @@ use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::llms::{LLMId, LLMPreferences};
 use crate::auth::auth_state::AuthStateProvider;
-use crate::cloud_object::{CloudObject, Owner};
+use crate::cloud_object::{CloudObject, CloudObjectLookup as _, Owner};
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
 use crate::server::server_api::ai::AIClient;
@@ -223,8 +223,7 @@ impl EnvironmentChoice {
         } else if let Some(id) = args.environment {
             Self::get_by_id(id, ctx)
         } else {
-            let all_environments =
-                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
+            let all_environments = CloudAmbientAgentEnvironment::get_all(ctx);
             let mut synced_environments: Vec<(ServerId, &CloudAmbientAgentEnvironment)> =
                 all_environments
                     .iter()
@@ -303,11 +302,12 @@ Without an environment, the agent will not be able to access private repositorie
         })?);
 
         let environment =
-            crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(&sync_id, ctx)
-                .ok_or_else(|| ResolveConfigurationError::ObjectNotFound {
+            CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx).ok_or_else(|| {
+                ResolveConfigurationError::ObjectNotFound {
                     id: id.clone(),
                     kind: "environment",
-                })?;
+                }
+            })?;
 
         Ok(EnvironmentChoice::Environment {
             id,

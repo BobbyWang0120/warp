@@ -7,7 +7,8 @@ use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
 
 use crate::{
-    cloud_object::model::generic_string_model::StringModel,
+    ai::cloud_environments::CloudAmbientAgentEnvironment,
+    cloud_object::{model::generic_string_model::StringModel, CloudObjectLookup as _},
     editor::{
         EditorOptions, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
         TextOptions,
@@ -577,9 +578,7 @@ impl DisplayChipMenu {
 
         let item = self.filtered_items.get(self.selected_index)?.item.clone();
         let sync_id = Self::parse_sync_id_lossy(&item.action_data());
-        let env = crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-            &sync_id, app,
-        )?;
+        let env = CloudAmbientAgentEnvironment::get_by_id(&sync_id, app)?;
 
         let repo_names = env
             .model()

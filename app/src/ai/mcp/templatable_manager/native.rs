@@ -3,6 +3,7 @@ use crate::ai::mcp::templatable_manager::oauth::{
     load_credentials_from_secure_storage, write_to_secure_storage, FILE_BASED_MCP_CREDENTIALS_KEY,
     TEMPLATABLE_MCP_CREDENTIALS_KEY,
 };
+use crate::ai::mcp::CloudMCPServer;
 use crate::ai::mcp::FileBasedMCPManager;
 use core::fmt;
 use itertools::Itertools;
@@ -21,7 +22,10 @@ use crate::ai::mcp::parsing::resolve_json;
 use crate::ai::mcp::TemplatableMCPServer;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{CloudObject, CloudObjectLocation, CloudObjectMetadataExt, Space};
+use crate::cloud_object::{
+    CloudObject, CloudObjectLocation, CloudObjectLookup as _, CloudObjectMetadataExt,
+    CloudObjectUuidLookup as _, Space,
+};
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{ClientId, ServerId};
 use crate::server::telemetry::{
@@ -276,9 +280,9 @@ impl TemplatableMCPServerManager {
                     },
             } => {
                 log::debug!("A new MCP server template was found with sync id {new_sync_id}");
-                if let Some(new_server) = crate::ai::mcp::templatable::get_cloud_templatable_mcp_server_by_id(new_sync_id, ctx) {
+                if let Some(new_server) = CloudTemplatableMCPServer::get_by_id(new_sync_id, ctx) {
                     let uuid = new_server.model().string_model.uuid;
-                    if let Some(legacy_server) = crate::ai::mcp::get_cloud_mcp_server_by_uuid(&uuid, ctx) {
+                    if let Some(legacy_server) = CloudMCPServer::get_by_uuid(&uuid, ctx) {
                         let old_sync_id = legacy_server.sync_id();
                         me.delete_legacy_mcp_server(old_sync_id, InitiatedBy::System, ctx);
                         log::info!("Successfully converted MCP server {old_sync_id} into {uuid} with sync id {new_sync_id}.");
@@ -372,7 +376,7 @@ impl TemplatableMCPServerManager {
 
     fn get_cloud_servers(ctx: &mut ModelContext<Self>) -> HashMap<Uuid, CloudTemplatableMCPServer> {
         let cloud_templatable_mcp_servers: Vec<CloudTemplatableMCPServer> =
-            crate::ai::mcp::templatable::get_all_cloud_templatable_mcp_servers(ctx);
+            CloudTemplatableMCPServer::get_all(ctx);
         cloud_templatable_mcp_servers
             .into_iter()
             .map(|server| (server.model().string_model.uuid, server))
@@ -1422,7 +1426,7 @@ impl TemplatableMCPServerManager {
         servers_to_restart: HashSet<Uuid>,
         ctx: &mut ModelContext<Self>,
     ) {
-        let cloud_legacy_servers = crate::ai::mcp::get_all_cloud_mcp_servers(ctx);
+        let cloud_legacy_servers = CloudMCPServer::get_all(ctx);
         log::info!(
             "Converting {} legacy MCP servers into templatable MCP servers",
             cloud_legacy_servers.len()

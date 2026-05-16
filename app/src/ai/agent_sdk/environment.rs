@@ -22,7 +22,7 @@ use crate::ai::cloud_environments::{
 };
 use crate::auth::UserUid;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
-use crate::cloud_object::CloudObject;
+use crate::cloud_object::{CloudObject, CloudObjectLookup as _};
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
 };
@@ -200,8 +200,7 @@ impl EnvironmentCommandRunner {
                 return;
             }
 
-            let environments =
-                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
+            let environments = CloudAmbientAgentEnvironment::get_all(ctx);
 
             let environment_infos: Vec<_> = environments
                 .iter()
@@ -284,10 +283,7 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment =
-                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                    &sync_id, ctx,
-                );
+            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
 
             if let Some(environment) = environment {
                 Self::print_environment_details(&environment.model().string_model);
@@ -879,10 +875,7 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment =
-                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                    &sync_id, ctx,
-                );
+            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(
@@ -1061,10 +1054,7 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment =
-                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                    &sync_id, ctx,
-                );
+            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(

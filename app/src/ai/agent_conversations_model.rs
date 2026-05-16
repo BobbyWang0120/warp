@@ -15,9 +15,11 @@ use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
 };
+use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::auth::AuthStateProvider;
+use crate::cloud_object::CloudObjectLookup as _;
 use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
 use crate::server::cloud_objects::update_manager::{UpdateManager, UpdateManagerEvent};
 use crate::server::ids::{ServerId, SyncId};
@@ -1535,11 +1537,7 @@ impl AgentConversationsModel {
                 continue;
             };
             let sync_id = SyncId::ServerId(server_id);
-            let Some(env) =
-                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                    &sync_id, ctx,
-                )
-            else {
+            let Some(env) = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx) else {
                 continue;
             };
             let env_model = &env.model().string_model;

@@ -12,8 +12,8 @@ use crate::{
             json_model::{JsonModel, JsonSerializer},
             persistence::CloudModel,
         },
-        GenericCloudObject, GenericStringObjectFormat, GenericStringObjectUniqueKey,
-        JsonObjectType, Owner, Revision,
+        CloudObjectLookup as _, GenericCloudObject, GenericStringObjectFormat,
+        GenericStringObjectUniqueKey, JsonObjectType, Owner, Revision,
     },
     drive::CloudObjectTypeAndId,
     server::{
@@ -57,21 +57,6 @@ pub type CloudScheduledAmbientAgent =
     GenericCloudObject<GenericStringObjectId, CloudScheduledAmbientAgentModel>;
 pub type CloudScheduledAmbientAgentModel =
     GenericStringModel<ScheduledAmbientAgent, JsonSerializer>;
-
-pub fn get_all_cloud_scheduled_ambient_agents(app: &AppContext) -> Vec<CloudScheduledAmbientAgent> {
-    CloudModel::as_ref(app)
-        .get_all_objects_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>()
-        .cloned()
-        .collect()
-}
-
-pub fn get_cloud_scheduled_ambient_agent_by_id<'a>(
-    sync_id: &'a SyncId,
-    app: &'a AppContext,
-) -> Option<&'a CloudScheduledAmbientAgent> {
-    CloudModel::as_ref(app)
-        .get_object_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>(sync_id)
-}
 
 impl ScheduledAmbientAgent {
     pub fn new(name: String, cron_schedule: String, enabled: bool, prompt: String) -> Self {
@@ -194,7 +179,7 @@ impl ScheduledAgentManager {
 
     /// List all scheduled ambient agents currently present in the local cloud object store.
     pub fn list_schedules(&self, app: &AppContext) -> Vec<CloudScheduledAmbientAgent> {
-        get_all_cloud_scheduled_ambient_agents(app)
+        CloudScheduledAmbientAgent::get_all(app)
     }
 
     /// Get the execution history for a scheduled ambient agent.
@@ -281,7 +266,7 @@ impl ScheduledAgentManager {
     where
         F: FnOnce(&mut ScheduledAmbientAgent) + Send + 'static,
     {
-        let schedule_object = get_cloud_scheduled_ambient_agent_by_id(&schedule_id, ctx);
+        let schedule_object = CloudScheduledAmbientAgent::get_by_id(&schedule_id, ctx);
 
         match schedule_object {
             Some(schedule_obj) => {

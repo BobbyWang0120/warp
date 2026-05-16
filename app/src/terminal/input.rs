@@ -47,6 +47,7 @@ use crate::ai::predict::prompt_suggestions::{
 };
 use crate::ai::skills::SkillManager;
 use crate::ai::skills::{SkillOpenOrigin, SkillTelemetryEvent};
+use crate::cloud_object::CloudObjectLookup as _;
 use crate::context_chips::spacing;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
@@ -123,6 +124,7 @@ use crate::ai::blocklist::handoff::{HandoffLaunchAttachments, PendingCloudLaunch
 use crate::ai::blocklist::AttachmentType;
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
 use crate::ai::blocklist::PendingAttachment;
+use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::cloud_object::model::generic_string_model::StringModel;
 use crate::server::server_api::ai::AttachmentFileInfo;
@@ -3796,8 +3798,7 @@ impl Input {
                     repos: vec![touched_repo],
                     orphan_files: vec![],
                 };
-                let mut envs =
-                    crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
+                let mut envs = CloudAmbientAgentEnvironment::get_all(ctx);
                 sort_environments_by_recency(&mut envs);
                 if let Some(overlap_env) = pick_handoff_overlap_env(&workspace, envs) {
                     handoff_compose_state.update(ctx, |state, ctx| {
@@ -3995,7 +3996,7 @@ impl Input {
             return true;
         }
 
-        if crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx).is_empty() {
+        if CloudAmbientAgentEnvironment::get_all(ctx).is_empty() {
             ctx.emit(Event::OpenHandoffEnvironmentCreationModal);
             return true;
         }
@@ -6287,11 +6288,7 @@ impl Input {
                 self.handoff_compose_state
                     .as_ref(ctx)
                     .selected_environment_id()
-                    .and_then(|id| {
-                        crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                            id, ctx,
-                        )
-                    })
+                    .and_then(|id| CloudAmbientAgentEnvironment::get_by_id(id, ctx))
                     .map(|env| format!("Hand off to {}", env.model().string_model.display_name()))
                     .unwrap_or_else(|| "Handoff to cloud".to_owned())
             };

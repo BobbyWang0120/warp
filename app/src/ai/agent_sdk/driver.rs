@@ -76,7 +76,7 @@ use crate::{
             },
             BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIPermissions,
         },
-        cloud_environments::{AmbientAgentEnvironment, GithubRepo},
+        cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment, GithubRepo},
         execution_profiles::profiles::AIExecutionProfilesModel,
         mcp::{
             file_based_manager::{FileBasedMCPManager, FileBasedMCPManagerEvent},
@@ -86,7 +86,7 @@ use crate::{
         },
     },
     auth::AuthStateProvider,
-    cloud_object::CloudObject,
+    cloud_object::{CloudObject, CloudObjectLookup as _},
     server::{
         ids::{ServerId, SyncId},
         server_api::{
@@ -809,8 +809,7 @@ impl AgentDriver {
 
     /// Log all valid environment IDs for the user.
     pub(super) fn log_valid_environments(app: &AppContext) {
-        let environments =
-            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(app);
+        let environments = CloudAmbientAgentEnvironment::get_all(app);
         if environments.is_empty() {
             log::error!("No environments available for this user.");
         } else {

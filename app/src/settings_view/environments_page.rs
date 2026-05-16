@@ -21,7 +21,8 @@ use crate::{
     appearance::Appearance,
     cloud_object::{
         model::persistence::{CloudModel, CloudModelEvent},
-        CloudObjectLocation, GenericStringObjectFormat, JsonObjectType, Owner, Space,
+        CloudObjectLocation, CloudObjectLookup as _, GenericStringObjectFormat, JsonObjectType,
+        Owner, Space,
     },
     drive::CloudObjectTypeAndId,
     editor::{EditorView, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions},
@@ -250,8 +251,7 @@ pub struct EnvironmentsPageView {
 
 impl EnvironmentsPageView {
     fn ensure_environment_mouse_states(&mut self, ctx: &mut ViewContext<Self>) {
-        let environments =
-            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
+        let environments = CloudAmbientAgentEnvironment::get_all(ctx);
         for env in &environments {
             self.copy_button_mouse_states.entry(env.id).or_default();
             self.edit_button_mouse_states.entry(env.id).or_default();
@@ -267,20 +267,16 @@ impl EnvironmentsPageView {
         match &page {
             EnvironmentsPage::Edit { env_id } => {
                 // Extract environment data for edit mode
-                let env_data =
-                    crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                        env_id, ctx,
-                    )
-                    .map(|env| {
-                        let model = &env.model().string_model;
-                        EnvironmentFormValues {
-                            name: model.name.clone(),
-                            description: model.description.clone().unwrap_or_default(),
-                            selected_repos: model.github_repos.clone(),
-                            docker_image: model.base_image.to_string(),
-                            setup_commands: model.setup_commands.clone(),
-                        }
-                    });
+                let env_data = CloudAmbientAgentEnvironment::get_by_id(env_id, ctx).map(|env| {
+                    let model = &env.model().string_model;
+                    EnvironmentFormValues {
+                        name: model.name.clone(),
+                        description: model.description.clone().unwrap_or_default(),
+                        selected_repos: model.github_repos.clone(),
+                        docker_image: model.base_image.to_string(),
+                        setup_commands: model.setup_commands.clone(),
+                    }
+                });
 
                 if let Some(initial_values) = env_data {
                     self.environment_form.update(ctx, |form, ctx| {
@@ -494,7 +490,7 @@ impl EnvironmentsPageView {
         let mut share_button_mouse_states = HashMap::new();
         let mut card_hover_mouse_states = HashMap::new();
         let mut view_runs_link_mouse_states = HashMap::new();
-        for env in crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx) {
+        for env in CloudAmbientAgentEnvironment::get_all(ctx) {
             copy_button_mouse_states
                 .entry(env.id)
                 .or_insert_with(MouseStateHandle::default);
@@ -794,10 +790,7 @@ impl EnvironmentsPageView {
                 environment,
             } => {
                 // Verify the environment still exists
-                let Some(existing_env) =
-                    crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                        env_id, ctx,
-                    )
+                let Some(existing_env) = CloudAmbientAgentEnvironment::get_by_id(env_id, ctx)
                 else {
                     self.show_error_toast(
                         "Unable to save: environment no longer exists.".to_string(),
@@ -827,11 +820,7 @@ impl EnvironmentsPageView {
             }
             UpdateEnvironmentFormEvent::DeleteRequested { env_id } => {
                 // Get the environment name for the confirmation dialog
-                if let Some(env) =
-                    crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
-                        env_id, ctx,
-                    )
-                {
+                if let Some(env) = CloudAmbientAgentEnvironment::get_by_id(env_id, ctx) {
                     let env_name = env.model().string_model.name.clone();
                     self.delete_confirmation_dialog.update(ctx, |dialog, ctx| {
                         dialog.show(*env_id, env_name, ctx);
@@ -1117,7 +1106,7 @@ impl EnvironmentsPageWidget {
         // We keep the owner alongside the display data so we can partition the list into Personal
         // vs Team scoped sections.
         let mut environments: Vec<(Owner, EnvironmentDisplayData)> =
-            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(app)
+            CloudAmbientAgentEnvironment::get_all(app)
                 .iter()
                 .map(|env| {
                     (

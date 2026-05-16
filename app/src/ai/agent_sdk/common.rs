@@ -223,7 +223,8 @@ impl EnvironmentChoice {
         } else if let Some(id) = args.environment {
             Self::get_by_id(id, ctx)
         } else {
-            let all_environments = CloudAmbientAgentEnvironment::get_all(ctx);
+            let all_environments =
+                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
             let mut synced_environments: Vec<(ServerId, &CloudAmbientAgentEnvironment)> =
                 all_environments
                     .iter()
@@ -302,12 +303,11 @@ Without an environment, the agent will not be able to access private repositorie
         })?);
 
         let environment =
-            CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx).ok_or_else(|| {
-                ResolveConfigurationError::ObjectNotFound {
+            crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(&sync_id, ctx)
+                .ok_or_else(|| ResolveConfigurationError::ObjectNotFound {
                     id: id.clone(),
                     kind: "environment",
-                }
-            })?;
+                })?;
 
         Ok(EnvironmentChoice::Environment {
             id,

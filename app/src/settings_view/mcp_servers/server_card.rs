@@ -27,9 +27,7 @@ use warpui::{
 };
 
 use crate::{
-    ai::mcp::{
-        templatable::CloudTemplatableMCPServer, MCPServerState, TemplatableMCPServerManager,
-    },
+    ai::mcp::{MCPServerState, TemplatableMCPServerManager},
     appearance::Appearance,
     cloud_object::CloudObject,
     settings_view::mcp_servers::{style, ServerCardItemId},
@@ -618,7 +616,11 @@ impl ServerCardView {
 
         match self.item_id {
             ServerCardItemId::TemplatableMCP(template_uuid) => {
-                let cloud_server = CloudTemplatableMCPServer::get_by_uuid(&template_uuid, app);
+                let cloud_server =
+                    crate::ai::mcp::templatable::get_cloud_templatable_mcp_server_by_uuid(
+                        &template_uuid,
+                        app,
+                    );
                 if let Some(cloud_server) = cloud_server {
                     lines.push(format!("Template sync id: {}", cloud_server.sync_id()));
                 }
@@ -633,7 +635,11 @@ impl ServerCardView {
                         Some(uuid) => format!("Gallery Id: {uuid}"),
                         None => "Gallery Id: None".to_string(),
                     };
-                    let cloud_server = CloudTemplatableMCPServer::get_by_uuid(&template_uuid, app);
+                    let cloud_server =
+                        crate::ai::mcp::templatable::get_cloud_templatable_mcp_server_by_uuid(
+                            &template_uuid,
+                            app,
+                        );
                     let template_sync_id_text = match cloud_server {
                         Some(cloud_server) => {
                             format!("Template sync id: {}", cloud_server.sync_id())

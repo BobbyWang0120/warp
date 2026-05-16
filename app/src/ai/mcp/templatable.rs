@@ -205,30 +205,28 @@ pub type CloudTemplatableMCPServer =
     GenericCloudObject<GenericStringObjectId, CloudTemplatableMCPServerModel>;
 pub type CloudTemplatableMCPServerModel = GenericStringModel<TemplatableMCPServer, JsonSerializer>;
 
-impl CloudTemplatableMCPServer {
-    pub fn get_all(app: &AppContext) -> Vec<CloudTemplatableMCPServer> {
-        CloudModel::as_ref(app)
-            .get_all_objects_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>()
-            .cloned()
-            .collect()
-    }
+pub fn get_all_cloud_templatable_mcp_servers(app: &AppContext) -> Vec<CloudTemplatableMCPServer> {
+    CloudModel::as_ref(app)
+        .get_all_objects_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>()
+        .cloned()
+        .collect()
+}
 
-    pub fn get_by_id<'a>(
-        sync_id: &'a SyncId,
-        app: &'a AppContext,
-    ) -> Option<&'a CloudTemplatableMCPServer> {
-        CloudModel::as_ref(app)
-            .get_object_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>(sync_id)
-    }
+pub fn get_cloud_templatable_mcp_server_by_id<'a>(
+    sync_id: &'a SyncId,
+    app: &'a AppContext,
+) -> Option<&'a CloudTemplatableMCPServer> {
+    CloudModel::as_ref(app)
+        .get_object_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>(sync_id)
+}
 
-    pub fn get_by_uuid<'a>(
-        uuid: &'a uuid::Uuid,
-        app: &'a AppContext,
-    ) -> Option<&'a CloudTemplatableMCPServer> {
-        CloudModel::as_ref(app)
-            .get_all_objects_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>()
-            .find(|server| server.model().string_model.uuid == *uuid)
-    }
+pub fn get_cloud_templatable_mcp_server_by_uuid<'a>(
+    uuid: &'a uuid::Uuid,
+    app: &'a AppContext,
+) -> Option<&'a CloudTemplatableMCPServer> {
+    CloudModel::as_ref(app)
+        .get_all_objects_of_type::<GenericStringObjectId, CloudTemplatableMCPServerModel>()
+        .find(|server| server.model().string_model.uuid == *uuid)
 }
 
 impl StringModel for TemplatableMCPServer {

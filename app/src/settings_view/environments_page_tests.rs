@@ -619,7 +619,8 @@ fn test_render_list_page_with_no_environments_shows_empty_state() {
             let appearance = Appearance::as_ref(ctx);
 
             // CloudModel mock should have no environments by default
-            let environments = CloudAmbientAgentEnvironment::get_all(ctx);
+            let environments =
+                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
             assert_eq!(
                 environments.len(),
                 0,
@@ -662,7 +663,8 @@ fn test_render_list_page_with_environments_shows_list() {
             CloudModel::handle(ctx).update(ctx, |model, ctx| {
                 model.create_object(sync_id, object, ctx);
             });
-            let environments = CloudAmbientAgentEnvironment::get_all(ctx);
+            let environments =
+                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
             assert_eq!(
                 environments.len(),
                 1,

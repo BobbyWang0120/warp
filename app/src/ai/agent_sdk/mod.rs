@@ -50,7 +50,6 @@ use warpui::{platform::TerminationMode, AppContext, SingletonEntity};
 
 use crate::{
     ai::ambient_agents::{task::HarnessConfig, AmbientAgentTaskId},
-    ai::cloud_environments::CloudAmbientAgentEnvironment,
     auth::AuthStateProvider,
     send_telemetry_sync_from_app_ctx,
     server::{
@@ -1285,13 +1284,15 @@ impl AgentDriverRunner {
                 })?;
                 let sync_id = SyncId::ServerId(server_id);
 
-                CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx)
-                    .ok_or_else(|| {
-                        log::error!("Environment not found with ID: {environment_id}");
-                        AgentDriver::log_valid_environments(ctx);
-                        AgentDriverError::EnvironmentNotFound(environment_id)
-                    })
-                    .map(|env| env.model().string_model.clone())
+                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                    &sync_id, ctx,
+                )
+                .ok_or_else(|| {
+                    log::error!("Environment not found with ID: {environment_id}");
+                    AgentDriver::log_valid_environments(ctx);
+                    AgentDriverError::EnvironmentNotFound(environment_id)
+                })
+                .map(|env| env.model().string_model.clone())
             })
             .await??;
 

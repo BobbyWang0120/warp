@@ -40,7 +40,7 @@ use crate::ai::ambient_agents::task::TaskPrincipalInfo;
 use crate::ai::ambient_agents::{cancel_task_with_toast, AmbientAgentTaskId};
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::ai::cloud_environments::{AmbientAgentEnvironment, CloudAmbientAgentEnvironment};
+use crate::ai::cloud_environments::AmbientAgentEnvironment;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::harness_display;
 use crate::appearance::Appearance;
@@ -1888,7 +1888,10 @@ impl View for ConversationDetailsPanel {
             if let Some((eid, env)) = environment_id.as_deref().and_then(|eid| {
                 let server_id = ServerId::try_from(eid).ok()?;
                 let sync_id = SyncId::ServerId(server_id);
-                let env = CloudAmbientAgentEnvironment::get_by_id(&sync_id, app).cloned()?;
+                let env = crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                    &sync_id, app,
+                )
+                .cloned()?;
                 Some((eid, env))
             }) {
                 let env_model = &env.model().string_model;
@@ -2043,7 +2046,11 @@ impl TypedActionView for ConversationDetailsPanel {
                     // Fetch docker image from environment
                     if let Ok(server_id) = ServerId::try_from(env_id.as_str()) {
                         let sync_id = SyncId::ServerId(server_id);
-                        if let Some(env) = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx) {
+                        if let Some(env) =
+                            crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                                &sync_id, ctx,
+                            )
+                        {
                             let docker_image = env.model().string_model.base_image.to_string();
                             ctx.clipboard()
                                 .write(ClipboardContent::plain_text(docker_image));

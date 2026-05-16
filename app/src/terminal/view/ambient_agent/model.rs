@@ -23,7 +23,6 @@ use crate::ai::blocklist::handoff::touched_repos::TouchedWorkspace;
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
 use crate::ai::blocklist::handoff::PendingCloudLaunch;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::execution_profiles::{CloudAgentComputerUseState, ComputerUsePermission};
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::llms::{LLMId, LLMPreferences};
@@ -379,7 +378,9 @@ impl AmbientAgentViewModel {
     /// If the environment no longer exists, clears the selection.
     fn validate_environment_after_initial_load(&mut self, ctx: &mut ModelContext<Self>) {
         if let Some(id) = &self.environment_id {
-            if CloudAmbientAgentEnvironment::get_by_id(id, ctx).is_none() {
+            if crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(id, ctx)
+                .is_none()
+            {
                 log::warn!(
                     "Environment {id:?} no longer exists after initial load, clearing selection"
                 );
@@ -693,7 +694,9 @@ impl AmbientAgentViewModel {
         ctx: &mut ModelContext<Self>,
     ) {
         if let Some(id) = &environment_id {
-            if CloudAmbientAgentEnvironment::get_by_id(id, ctx).is_none() {
+            if crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(id, ctx)
+                .is_none()
+            {
                 log::warn!("Tried to select unknown environment {id:?}");
                 return;
             }

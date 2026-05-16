@@ -25,8 +25,6 @@ use crate::ai::agent_sdk::driver::{
     environment::prepare_environment, terminal::TerminalDriver, WARP_DRIVE_SYNC_TIMEOUT,
 };
 #[cfg(not(target_family = "wasm"))]
-use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
-#[cfg(not(target_family = "wasm"))]
 use crate::server::cloud_objects::update_manager::UpdateManager;
 #[cfg(not(target_family = "wasm"))]
 use crate::server::ids::{ServerId, SyncId};
@@ -236,8 +234,10 @@ impl TerminalView {
                     .spawn(|_, ctx| {
                         let server_id = ServerId::try_from("SVhg783GBFQHk1OfdPfFU9").ok()?;
                         let sync_id = SyncId::ServerId(server_id);
-                        CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx)
-                            .map(|env| env.model().string_model.clone())
+                        crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                            &sync_id, ctx,
+                        )
+                        .map(|env| env.model().string_model.clone())
                     })
                     .await
                     .map_err(|_| "view dropped")?

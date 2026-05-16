@@ -12,7 +12,7 @@ use warpui::platform::TerminationMode;
 use warpui::{AppContext, SingletonEntity};
 
 use crate::ai::ambient_agents::scheduled::{
-    CloudScheduledAmbientAgent, ScheduledAgentManager, ScheduledAmbientAgent, UpdateScheduleParams,
+    ScheduledAgentManager, ScheduledAmbientAgent, UpdateScheduleParams,
 };
 use crate::ai::ambient_agents::AgentConfigSnapshot;
 use crate::cloud_object::CloudObject;
@@ -601,7 +601,12 @@ fn get(
                 return;
             }
 
-            let Some(schedule) = CloudScheduledAmbientAgent::get_by_id(&schedule_id, ctx) else {
+            let Some(schedule) =
+                crate::ai::ambient_agents::scheduled::get_cloud_scheduled_ambient_agent_by_id(
+                    &schedule_id,
+                    ctx,
+                )
+            else {
                 super::report_fatal_error(anyhow::anyhow!("Schedule not found"), ctx);
                 return;
             };

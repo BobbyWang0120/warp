@@ -200,7 +200,8 @@ impl EnvironmentCommandRunner {
                 return;
             }
 
-            let environments = CloudAmbientAgentEnvironment::get_all(ctx);
+            let environments =
+                crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
 
             let environment_infos: Vec<_> = environments
                 .iter()
@@ -283,7 +284,10 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
+            let environment =
+                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                    &sync_id, ctx,
+                );
 
             if let Some(environment) = environment {
                 Self::print_environment_details(&environment.model().string_model);
@@ -875,7 +879,10 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
+            let environment =
+                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                    &sync_id, ctx,
+                );
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(
@@ -1054,7 +1061,10 @@ impl EnvironmentCommandRunner {
                 }
             };
             let sync_id = SyncId::ServerId(server_id);
-            let environment = CloudAmbientAgentEnvironment::get_by_id(&sync_id, ctx);
+            let environment =
+                crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                    &sync_id, ctx,
+                );
             let Some(environment) = environment else {
                 let error = anyhow::anyhow!("Environment {} not found", id);
                 ctx.terminate_app(

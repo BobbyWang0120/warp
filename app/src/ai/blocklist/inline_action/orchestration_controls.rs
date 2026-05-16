@@ -34,7 +34,6 @@ use warp_core::ui::theme::Fill;
 
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
-use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
 use crate::ai::execution_profiles::model_menu_items::available_model_menu_items;
 use crate::ai::harness_availability::{AuthSecretFetchState, HarnessAvailabilityModel};
 use crate::ai::harness_display;
@@ -652,7 +651,8 @@ pub fn create_environment_picker<A: OrchestrationControlAction, V: View>(
     });
     dropdown_handle.update(ctx, |dropdown, ctx_dropdown| {
         dropdown.set_menu_width(280.0, ctx_dropdown);
-        let all_envs = CloudAmbientAgentEnvironment::get_all(ctx_dropdown);
+        let all_envs =
+            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx_dropdown);
         let mut sorted_envs: Vec<(String, String)> = all_envs
             .iter()
             .map(|env| (env.id.uid(), env.model().string_model.name.clone()))
@@ -744,11 +744,13 @@ pub fn resolve_default_environment_id(ctx: &AppContext) -> Option<String> {
         .last_selected_environment_id
         .value()
     {
-        if CloudAmbientAgentEnvironment::get_by_id(&env_id, ctx).is_some() {
+        if crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(&env_id, ctx)
+            .is_some()
+        {
             return Some(env_id.uid());
         }
     }
-    let mut envs = CloudAmbientAgentEnvironment::get_all(ctx);
+    let mut envs = crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
     envs.sort_by(|a, b| {
         b.metadata
             .last_task_run_ts
@@ -770,7 +772,7 @@ pub fn persist_environment_selection<V: View>(environment_id: &str, ctx: &mut Vi
     if environment_id.is_empty() {
         return;
     }
-    let all_envs = CloudAmbientAgentEnvironment::get_all(ctx);
+    let all_envs = crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
     if let Some(env) = all_envs.iter().find(|e| e.id.uid() == environment_id) {
         let sync_id = env.id;
         CloudAgentSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -1177,7 +1179,9 @@ pub fn sync_picker_selections<A: OrchestrationControlAction, V: View>(
                 dropdown.set_selected_by_name(ORCHESTRATION_ENV_NONE_LABEL, ctx_dropdown);
                 return;
             }
-            let all_envs = CloudAmbientAgentEnvironment::get_all(ctx_dropdown);
+            let all_envs = crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(
+                ctx_dropdown,
+            );
             if let Some(env) = all_envs.iter().find(|e| e.id.uid() == env_id) {
                 dropdown.set_selected_by_name(&env.model().string_model.name, ctx_dropdown);
             }
@@ -1660,7 +1664,8 @@ pub fn empty_env_recommendation_message(
     if !worker_host.eq_ignore_ascii_case(ORCHESTRATION_WARP_WORKER_HOST) {
         return None;
     }
-    let env_count = CloudAmbientAgentEnvironment::get_all(app).len();
+    let env_count =
+        crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(app).len();
     Some(if env_count > 0 {
         "We recommend selecting an environment for cloud agents.".to_string()
     } else {

@@ -110,21 +110,21 @@ pub type CloudAmbientAgentEnvironment =
 pub type CloudAmbientAgentEnvironmentModel =
     GenericStringModel<AmbientAgentEnvironment, JsonSerializer>;
 
-impl CloudAmbientAgentEnvironment {
-    pub fn get_all(app: &AppContext) -> Vec<CloudAmbientAgentEnvironment> {
-        CloudModel::as_ref(app)
-            .get_all_objects_of_type::<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>()
-            .cloned()
-            .collect()
-    }
+pub fn get_all_cloud_ambient_agent_environments(
+    app: &AppContext,
+) -> Vec<CloudAmbientAgentEnvironment> {
+    CloudModel::as_ref(app)
+        .get_all_objects_of_type::<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>()
+        .cloned()
+        .collect()
+}
 
-    pub fn get_by_id<'a>(
-        sync_id: &'a SyncId,
-        app: &'a AppContext,
-    ) -> Option<&'a CloudAmbientAgentEnvironment> {
-        CloudModel::as_ref(app)
-            .get_object_of_type::<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>(sync_id)
-    }
+pub fn get_cloud_ambient_agent_environment_by_id<'a>(
+    sync_id: &'a SyncId,
+    app: &'a AppContext,
+) -> Option<&'a CloudAmbientAgentEnvironment> {
+    CloudModel::as_ref(app)
+        .get_object_of_type::<GenericStringObjectId, CloudAmbientAgentEnvironmentModel>(sync_id)
 }
 
 impl AmbientAgentEnvironment {

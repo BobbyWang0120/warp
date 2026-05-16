@@ -335,7 +335,8 @@ impl EnvironmentSelector {
             return;
         };
 
-        let mut environments = CloudAmbientAgentEnvironment::get_all(ctx);
+        let mut environments =
+            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
         sort_environments_by_recency(&mut environments);
         let Some(index) = environments.iter().position(|env| env.id == selected_id) else {
             return;
@@ -371,14 +372,19 @@ impl EnvironmentSelector {
         // First, try to restore the user's last selected environment from settings.
         if let Some(env_id) = self.get_saved_environment_from_settings(ctx) {
             // Verify the environment still exists.
-            if CloudAmbientAgentEnvironment::get_by_id(&env_id, ctx).is_some() {
+            if crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(
+                &env_id, ctx,
+            )
+            .is_some()
+            {
                 self.target.ensure_default_environment_id(env_id, ctx);
                 return;
             }
         }
 
         // Fall back to auto-selecting the most recently used environment.
-        let mut environments = CloudAmbientAgentEnvironment::get_all(ctx);
+        let mut environments =
+            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
         sort_environments_by_recency(&mut environments);
         if let Some(first_env) = environments.first() {
             self.target.ensure_default_environment_id(first_env.id, ctx);
@@ -402,7 +408,8 @@ impl EnvironmentSelector {
     }
 
     fn refresh_menu(&mut self, ctx: &mut ViewContext<Self>) {
-        let mut environments = CloudAmbientAgentEnvironment::get_all(ctx);
+        let mut environments =
+            crate::ai::cloud_environments::get_all_cloud_ambient_agent_environments(ctx);
         sort_environments_by_recency(&mut environments);
 
         let selected_id = self.target.selected_environment_id(ctx);
@@ -430,7 +437,7 @@ impl EnvironmentSelector {
 
     fn refresh_button(&mut self, ctx: &mut ViewContext<Self>) {
         let label = if let Some(id) = self.target.selected_environment_id(ctx) {
-            CloudAmbientAgentEnvironment::get_by_id(&id, ctx)
+            crate::ai::cloud_environments::get_cloud_ambient_agent_environment_by_id(&id, ctx)
                 .map(|env| env.model().string_model.display_name())
                 .unwrap_or_else(|| "New environment".to_string())
         } else {

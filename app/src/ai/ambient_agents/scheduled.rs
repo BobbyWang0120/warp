@@ -58,21 +58,19 @@ pub type CloudScheduledAmbientAgent =
 pub type CloudScheduledAmbientAgentModel =
     GenericStringModel<ScheduledAmbientAgent, JsonSerializer>;
 
-impl CloudScheduledAmbientAgent {
-    pub fn get_all(app: &AppContext) -> Vec<CloudScheduledAmbientAgent> {
-        CloudModel::as_ref(app)
-            .get_all_objects_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>()
-            .cloned()
-            .collect()
-    }
+pub fn get_all_cloud_scheduled_ambient_agents(app: &AppContext) -> Vec<CloudScheduledAmbientAgent> {
+    CloudModel::as_ref(app)
+        .get_all_objects_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>()
+        .cloned()
+        .collect()
+}
 
-    pub fn get_by_id<'a>(
-        sync_id: &'a SyncId,
-        app: &'a AppContext,
-    ) -> Option<&'a CloudScheduledAmbientAgent> {
-        CloudModel::as_ref(app)
-            .get_object_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>(sync_id)
-    }
+pub fn get_cloud_scheduled_ambient_agent_by_id<'a>(
+    sync_id: &'a SyncId,
+    app: &'a AppContext,
+) -> Option<&'a CloudScheduledAmbientAgent> {
+    CloudModel::as_ref(app)
+        .get_object_of_type::<GenericStringObjectId, CloudScheduledAmbientAgentModel>(sync_id)
 }
 
 impl ScheduledAmbientAgent {
@@ -196,7 +194,7 @@ impl ScheduledAgentManager {
 
     /// List all scheduled ambient agents currently present in the local cloud object store.
     pub fn list_schedules(&self, app: &AppContext) -> Vec<CloudScheduledAmbientAgent> {
-        CloudScheduledAmbientAgent::get_all(app)
+        get_all_cloud_scheduled_ambient_agents(app)
     }
 
     /// Get the execution history for a scheduled ambient agent.
@@ -283,7 +281,7 @@ impl ScheduledAgentManager {
     where
         F: FnOnce(&mut ScheduledAmbientAgent) + Send + 'static,
     {
-        let schedule_object = CloudScheduledAmbientAgent::get_by_id(&schedule_id, ctx);
+        let schedule_object = get_cloud_scheduled_ambient_agent_by_id(&schedule_id, ctx);
 
         match schedule_object {
             Some(schedule_obj) => {

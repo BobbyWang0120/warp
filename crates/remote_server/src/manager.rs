@@ -114,6 +114,7 @@ pub enum RemoteServerOperation {
     LoadRepoMetadataDirectory,
     IndexCodebase,
     ResyncCodebase,
+    TriggerCodebaseIncrementalSync,
     DropCodebaseIndex,
     OpenBuffer,
     SaveBuffer,
@@ -132,6 +133,7 @@ pub enum RemoteServerOperation {
 pub enum RemoteCodebaseIndexMutationKind {
     Request,
     AutoIndex,
+    IncrementalSync,
     Resync,
     Drop,
 }
@@ -140,6 +142,7 @@ impl RemoteCodebaseIndexMutationKind {
     fn operation(self) -> RemoteServerOperation {
         match self {
             Self::Request | Self::AutoIndex => RemoteServerOperation::IndexCodebase,
+            Self::IncrementalSync => RemoteServerOperation::TriggerCodebaseIncrementalSync,
             Self::Resync => RemoteServerOperation::ResyncCodebase,
             Self::Drop => RemoteServerOperation::DropCodebaseIndex,
         }
@@ -153,6 +156,11 @@ impl RemoteCodebaseIndexMutationKind {
     ) -> Result<RemoteCodebaseIndexStatus, crate::client::ClientError> {
         match self {
             Self::Request | Self::AutoIndex => client.index_codebase(repo_path, auth_token).await,
+            Self::IncrementalSync => {
+                client
+                    .trigger_codebase_incremental_sync(repo_path, auth_token)
+                    .await
+            }
             Self::Resync => client.resync_codebase(repo_path, auth_token).await,
             Self::Drop => client.drop_codebase_index(repo_path, auth_token).await,
         }
@@ -1237,8 +1245,8 @@ impl RemoteServerManager {
             )));
         }
 
-        log::info!(
-            "[Remote codebase indexing] Remote server initialize handshake complete: session={session_id:?} \
+        log::debug!(
+            "Remote server initialize handshake complete: session={session_id:?} \
              host={} server_version={:?}",
             resp.host_id,
             resp.server_version,
@@ -1483,6 +1491,19 @@ impl RemoteServerManager {
         self.mutate_codebase_index(remote_path, RemoteCodebaseIndexMutationKind::Resync, ctx);
     }
 
+    /// Sends a `TriggerCodebaseIncrementalSync` request to a connected daemon for this remote path.
+    pub fn trigger_codebase_incremental_sync(
+        &mut self,
+        remote_path: RemotePath,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.mutate_codebase_index(
+            remote_path,
+            RemoteCodebaseIndexMutationKind::IncrementalSync,
+            ctx,
+        );
+    }
+
     /// Sends a `DropCodebaseIndex` request to a connected daemon for this remote path.
     pub fn drop_codebase_index(&mut self, remote_path: RemotePath, ctx: &mut ModelContext<Self>) {
         self.mutate_codebase_index(remote_path, RemoteCodebaseIndexMutationKind::Drop, ctx);
@@ -1515,7 +1536,7 @@ impl RemoteServerManager {
             );
             return;
         };
-        log::info!(
+        log::debug!(
             "[Remote codebase indexing] Manager requesting codebase index mutation: \
              operation={operation:?} host={host_id} session={session_id:?} \
              remote_identity_key={remote_identity_key} repo_path={repo_path}"
@@ -1550,7 +1571,7 @@ impl RemoteServerManager {
 
                 match mutation_kind.send(client, repo_path, auth_token).await {
                     Ok(status) => {
-                        log::info!(
+                        log::debug!(
                             "[Remote codebase indexing] Manager received codebase index mutation response: \
                              operation={operation:?} host={host_id} session={session_id:?} \
                              remote_identity_key={remote_identity_key} repo_path={} state={:?}",

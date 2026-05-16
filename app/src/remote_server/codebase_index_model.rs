@@ -22,6 +22,7 @@ use super::manager::{
 pub struct RemoteCodebaseSearchContext {
     pub remote_path: RemotePath,
     pub root_hash: NodeHash,
+    pub is_stale: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -324,7 +325,7 @@ impl RemoteCodebaseIndexModel {
         statuses: &[RemoteCodebaseIndexStatusWithPath],
     ) -> bool {
         let status_count = statuses.len();
-        log::info!(
+        log::debug!(
             "[Remote codebase indexing] Client received bootstrap codebase index statuses snapshot: host_id={host_id} status_count={status_count}"
         );
         for status_with_path in statuses {
@@ -377,19 +378,15 @@ impl RemoteCodebaseIndexModel {
         if self.statuses.get(&remote_path) == Some(&status) {
             return false;
         }
-        log::info!(
-            "[Remote codebase indexing] Client applying codebase index status update: host_id={} state={:?} has_root_hash={}",
+        log::debug!(
+            "[Remote codebase indexing] Client applying codebase index status update: host_id={} repo_path={} state={:?} has_root_hash={} embedding_config={:?}",
             remote_path.host_id,
+            status.repo_path,
             status.state,
             status
                 .root_hash
                 .as_deref()
                 .is_some_and(|root_hash| !root_hash.is_empty()),
-        );
-        log::debug!(
-            "[Remote codebase indexing] Client applying codebase index status update: repo_path={} state={:?}",
-            status.repo_path,
-            status.state,
         );
         self.statuses.insert(remote_path, status);
         true
@@ -545,6 +542,7 @@ fn search_availability_for_status(
             RemoteCodebaseSearchAvailability::Ready(RemoteCodebaseSearchContext {
                 remote_path,
                 root_hash,
+                is_stale: status.state == RemoteCodebaseIndexState::Stale,
             })
         }
         RemoteCodebaseIndexState::Queued | RemoteCodebaseIndexState::Indexing => {

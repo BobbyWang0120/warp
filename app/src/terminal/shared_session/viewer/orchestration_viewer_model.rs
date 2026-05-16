@@ -307,7 +307,10 @@ impl OrchestrationViewerModel {
             let status_for_initial = conversation_status.clone();
             // Seed the descriptive title as `fallback_display_title` so
             // `AIConversation::title()` can fall back to it when no initial
-            // query or task description is available.
+            // query or task description is available. When `task.name` is
+            // None this is the same string `display_name()` just returned
+            // for the pill label; the duplicate write is intentional because
+            // the two surfaces consume different fallback chains.
             let fallback_title = task.title.clone();
 
             let conversation_id = history_handle.update(ctx, |history, ctx| {

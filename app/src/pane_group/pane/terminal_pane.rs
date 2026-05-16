@@ -1966,10 +1966,12 @@ fn launch_remote_child(
             harness_auth_secrets,
             ..Default::default()
         }),
-        // Canonical outbound trim for the REST channel; empty → None.
-        name: Some(request_name)
-            .map(|n| n.trim().to_string())
-            .filter(|n| !n.is_empty()),
+        // Canonical outbound trim for the REST channel; empty → None. Mirrors
+        // the GraphQL trim in `AIClient::create_agent_task` impl.
+        name: {
+            let trimmed = request_name.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        },
         title: (!title.is_empty()).then_some(title),
         team: None,
         skill: None,

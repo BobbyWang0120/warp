@@ -781,9 +781,11 @@ input CreateAgentTaskInput {
   agentConfigSnapshot: String
 
   """
-  Optional short orchestrator-supplied display label for the child agent
-  (e.g. "frontend-tests"). Distinct from the descriptive `title` derived from
-  prompt/skill. Empty or whitespace-only values are normalized to NULL.
+  Optional short display label for the agent (e.g. "frontend-tests"),
+  sourced from `run_agents.agent_run_configs[i].name` when this task is
+  created by an orchestrator. Distinct from the descriptive `title`
+  derived from prompt/skill. Whitespace-only values are normalized to
+  NULL on the server.
   """
   agentName: String
 

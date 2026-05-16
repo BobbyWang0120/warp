@@ -102,10 +102,24 @@ fn make_task(
     title: &str,
     session_id: Option<&str>,
 ) -> AmbientAgentTask {
+    make_task_with_name(id, state, None, title, session_id)
+}
+
+/// Builds a minimal [`AmbientAgentTask`] with an explicit orchestrator-supplied
+/// short `name`. Use this in cases that exercise the QUALITY-731 round trip;
+/// the simpler [`make_task`] helper covers the older (`name = None`) wire shape.
+fn make_task_with_name(
+    id: &str,
+    state: AmbientAgentTaskState,
+    name: Option<&str>,
+    title: &str,
+    session_id: Option<&str>,
+) -> AmbientAgentTask {
     let now = Utc::now();
     AmbientAgentTask {
         task_id: task_id(id),
         parent_run_id: Some(PARENT_TASK_ID.to_string()),
+        name: name.map(String::from),
         title: title.to_string(),
         state,
         prompt: String::new(),
@@ -476,6 +490,153 @@ fn registers_multiple_children() {
         history.read(&app, |history, _| {
             let child_ids = history.child_conversation_ids_of(&parent_conv_id);
             assert_eq!(child_ids.len(), 2);
+        });
+    });
+}
+
+/// Registering a child whose task record carries an orchestrator-supplied
+/// short `name` must surface that name on the child conversation's
+/// `agent_name` while the descriptive `title` is preserved as the
+/// fallback display title. This is the QUALITY-731 round trip.
+#[test]
+fn registers_child_agent_name_from_orchestrator_name_and_preserves_title_fallback() {
+    App::test((), |mut app| async move {
+        let parent = task_id(PARENT_TASK_ID);
+        let (_, parent_conv_id, model) = setup_model(&mut app, parent);
+        let model_handle = app.add_model(|_| model);
+
+        model_handle.update(&mut app, |model, ctx| {
+            model.apply_children_fetch(
+                vec![make_task_with_name(
+                    CHILD_A_TASK_ID,
+                    AmbientAgentTaskState::InProgress,
+                    Some("api"),
+                    "Implement REST endpoints for users service",
+                    None,
+                )],
+                ctx,
+            );
+        });
+
+        let history = BlocklistAIHistoryModel::handle(&app);
+        history.read(&app, |history, _| {
+            let child_ids = history.child_conversation_ids_of(&parent_conv_id);
+            assert_eq!(child_ids.len(), 1);
+            let child = history
+                .conversation(&child_ids[0])
+                .expect("child conversation exists");
+            assert_eq!(
+                child.agent_name(),
+                Some("api"),
+                "orchestrator-supplied short name should be the pill label"
+            );
+            assert_eq!(
+                child.title().as_deref(),
+                Some("Implement REST endpoints for users service"),
+                "descriptive title is preserved as the fallback display title"
+            );
+        });
+    });
+}
+
+/// When the server has no orchestrator-supplied `name` for a task, the child
+/// conversation falls back to the descriptive `title` for both surfaces.
+/// This is the back-compat path for older server responses.
+#[test]
+fn registers_child_agent_name_falls_back_to_title_when_name_missing() {
+    App::test((), |mut app| async move {
+        let parent = task_id(PARENT_TASK_ID);
+        let (_, parent_conv_id, model) = setup_model(&mut app, parent);
+        let model_handle = app.add_model(|_| model);
+
+        model_handle.update(&mut app, |model, ctx| {
+            model.apply_children_fetch(
+                vec![make_task_with_name(
+                    CHILD_A_TASK_ID,
+                    AmbientAgentTaskState::InProgress,
+                    None,
+                    "Implement REST endpoints",
+                    None,
+                )],
+                ctx,
+            );
+        });
+
+        let history = BlocklistAIHistoryModel::handle(&app);
+        history.read(&app, |history, _| {
+            let child_ids = history.child_conversation_ids_of(&parent_conv_id);
+            let child = history
+                .conversation(&child_ids[0])
+                .expect("child conversation exists");
+            assert_eq!(child.agent_name(), Some("Implement REST endpoints"));
+            assert_eq!(
+                child.title().as_deref(),
+                Some("Implement REST endpoints"),
+                "title is the only label available; it is used everywhere"
+            );
+        });
+    });
+}
+
+/// A whitespace-only `name` from the server must not collapse the child
+/// agent label to an empty string. The conversation falls back to the
+/// trimmed `title` for `agent_name()`.
+#[test]
+fn registers_child_agent_name_falls_back_to_title_when_name_is_whitespace_only() {
+    App::test((), |mut app| async move {
+        let parent = task_id(PARENT_TASK_ID);
+        let (_, parent_conv_id, model) = setup_model(&mut app, parent);
+        let model_handle = app.add_model(|_| model);
+
+        model_handle.update(&mut app, |model, ctx| {
+            model.apply_children_fetch(
+                vec![make_task_with_name(
+                    CHILD_A_TASK_ID,
+                    AmbientAgentTaskState::InProgress,
+                    Some("   "),
+                    "Implement endpoints",
+                    None,
+                )],
+                ctx,
+            );
+        });
+
+        let history = BlocklistAIHistoryModel::handle(&app);
+        history.read(&app, |history, _| {
+            let child_ids = history.child_conversation_ids_of(&parent_conv_id);
+            let child = history.conversation(&child_ids[0]).expect("child exists");
+            assert_eq!(child.agent_name(), Some("Implement endpoints"));
+        });
+    });
+}
+
+/// When both `name` and `title` are blank, the child agent label collapses
+/// to the literal `"Agent"` so the UI never renders an empty pill.
+#[test]
+fn registers_child_agent_name_falls_back_to_literal_agent_when_both_blank() {
+    App::test((), |mut app| async move {
+        let parent = task_id(PARENT_TASK_ID);
+        let (_, parent_conv_id, model) = setup_model(&mut app, parent);
+        let model_handle = app.add_model(|_| model);
+
+        model_handle.update(&mut app, |model, ctx| {
+            model.apply_children_fetch(
+                vec![make_task_with_name(
+                    CHILD_A_TASK_ID,
+                    AmbientAgentTaskState::InProgress,
+                    Some("   "),
+                    "",
+                    None,
+                )],
+                ctx,
+            );
+        });
+
+        let history = BlocklistAIHistoryModel::handle(&app);
+        history.read(&app, |history, _| {
+            let child_ids = history.child_conversation_ids_of(&parent_conv_id);
+            let child = history.conversation(&child_ids[0]).expect("child exists");
+            assert_eq!(child.agent_name(), Some("Agent"));
         });
     });
 }

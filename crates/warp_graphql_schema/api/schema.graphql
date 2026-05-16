@@ -780,6 +780,13 @@ input CreateAgentTaskInput {
   """
   agentConfigSnapshot: String
 
+  """
+  Optional short orchestrator-supplied display label for the child agent
+  (e.g. "frontend-tests"). Distinct from the descriptive `title` derived from
+  prompt/skill. Empty or whitespace-only values are normalized to NULL.
+  """
+  agentName: String
+
   """Optional environment UID to run the task in."""
   environmentUid: ID
 

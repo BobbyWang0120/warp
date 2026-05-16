@@ -277,6 +277,7 @@ fn ambient_agent_task_for_current_user(task_id: AmbientAgentTaskId) -> AmbientAg
     AmbientAgentTask {
         task_id,
         parent_run_id: None,
+        name: None,
         title: "Owned task".to_string(),
         state: AmbientAgentTaskState::Succeeded,
         prompt: "test".to_string(),

@@ -1678,6 +1678,11 @@ fn launch_local_harness_child(
         .and_then(|terminal_view| terminal_view.as_ref(ctx).active_session_shell_type(ctx));
 
     let model_id_for_harness_env = model_id.clone();
+    // Forward the orchestrator-supplied short name into the local-task creation
+    // path so the server records it under `agent_name` for local harness
+    // children too. Without this, viewers would only see the short label on
+    // remote (`SpawnAgentRequest`) children.
+    let agent_name_for_task = Some(request_name.clone());
     let _ = ctx.spawn(
         async move {
             prepare_local_harness_child_launch(
@@ -1685,6 +1690,7 @@ fn launch_local_harness_child(
                 harness_type,
                 model_id_for_harness_env,
                 parent_run_id,
+                agent_name_for_task,
                 shell_type,
                 startup_directory,
                 ai_client,
@@ -1856,6 +1862,12 @@ fn launch_remote_child(
         return None;
     };
 
+    // Clone the orchestrator-supplied short name before `request.name` is moved
+    // into `start_new_child_conversation` so the same short label can be sent
+    // to the server as `SpawnAgentRequest.name`. Without this clone the
+    // server-side `agent_name` would be lost on the first wire hop and viewers
+    // would have to fall back to `title`.
+    let request_name = request.name.clone();
     let terminal_view_id = new_terminal_view.id();
     let conversation_id = BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
         let id = history_model.start_new_child_conversation(
@@ -1959,6 +1971,12 @@ fn launch_remote_child(
             harness_auth_secrets,
             ..Default::default()
         }),
+        // Send the orchestrator-supplied short name so the server can persist
+        // it on the task record. Trimmed-empty names collapse to None so the
+        // server stores NULL rather than an empty string.
+        name: Some(request_name)
+            .map(|n| n.trim().to_string())
+            .filter(|n| !n.is_empty()),
         title: (!title.is_empty()).then_some(title),
         team: None,
         skill: None,

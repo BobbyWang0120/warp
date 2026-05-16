@@ -373,7 +373,13 @@ impl ConversationDetailsData {
                 environment_id,
                 conversation_id: task.conversation_id().map(str::to_string),
             },
-            title: task.title.clone(),
+            // Use the short orchestrator-supplied name when present so the
+            // side pane shows the same label as the orchestration pill bar.
+            // For older server responses without `name`, `display_name()`
+            // falls back to `title` and then `"Agent"`, preserving previous
+            // behavior. `source_prompt` keeps the prompt verbatim so the
+            // descriptive text remains discoverable below the header.
+            title: task.display_name().to_string(),
             created_at: Some(task.created_at.with_timezone(&Local)),
             artifacts: task.artifacts.clone(),
             credits,

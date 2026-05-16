@@ -19,6 +19,7 @@ fn task_with_run_time_and_credits() -> AmbientAgentTask {
     AmbientAgentTask {
         task_id: "550e8400-e29b-41d4-a716-000000005000".parse().unwrap(),
         parent_run_id: None,
+        name: None,
         title: "Task".to_string(),
         state: AmbientAgentTaskState::Succeeded,
         prompt: "test".to_string(),

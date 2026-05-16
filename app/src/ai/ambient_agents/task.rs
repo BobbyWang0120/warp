@@ -235,6 +235,18 @@ pub struct AmbientAgentTask {
     pub task_id: AmbientAgentTaskId,
     #[serde(default)]
     pub parent_run_id: Option<String>,
+    /// Optional short orchestrator-supplied display label for the agent
+    /// (e.g. `"frontend-tests"`).
+    ///
+    /// Distinct from `title`, which is the descriptive run title derived by the
+    /// server from explicit title/skill/prompt/UUID. `name` is the source of
+    /// truth for short label surfaces (pills, hover cards, transcript
+    /// participant labels). Old server responses without this field deserialize
+    /// to `None` via `#[serde(default)]`; clients must fall back to `title`.
+    ///
+    /// See `display_name()` for the canonical lookup.
+    #[serde(default)]
+    pub name: Option<String>,
     pub title: String,
     pub state: AmbientAgentTaskState,
     pub prompt: String,
@@ -312,6 +324,28 @@ pub struct TaskAttachment {
 impl AmbientAgentTask {
     pub fn run_id(&self) -> AmbientAgentTaskId {
         self.task_id
+    }
+
+    /// Returns the short display label preferred for agent-label UI surfaces
+    /// (pills, hover cards, transcript participant labels, details side pane).
+    ///
+    /// Lookup order:
+    /// 1. Trimmed `name` when present and non-empty (orchestrator-supplied).
+    /// 2. Trimmed `title` when non-empty (descriptive run title; the only
+    ///    label available for older server responses).
+    /// 3. The literal `"Agent"` so the UI never falls back to a blank label.
+    pub fn display_name(&self) -> &str {
+        if let Some(name) = self.name.as_deref() {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return trimmed;
+            }
+        }
+        let trimmed_title = self.title.trim();
+        if !trimmed_title.is_empty() {
+            return trimmed_title;
+        }
+        "Agent"
     }
 
     pub fn conversation_id(&self) -> Option<&str> {

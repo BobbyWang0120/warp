@@ -180,6 +180,7 @@ fn make_ambient_task_with_event_seq(
     crate::ai::ambient_agents::AmbientAgentTask {
         task_id: "550e8400-e29b-41d4-a716-446655440000".parse().unwrap(),
         parent_run_id: None,
+        name: None,
         title: "test".to_string(),
         state: crate::ai::ambient_agents::AmbientAgentTaskState::Succeeded,
         prompt: "prompt".to_string(),

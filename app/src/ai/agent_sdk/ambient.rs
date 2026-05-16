@@ -479,6 +479,9 @@ impl AmbientAgentRunner {
                 prompt,
                 mode,
                 config,
+                // CLI `agent run-cloud` is not an orchestrator child spawn, so
+                // there is no short orchestrator-supplied name to forward.
+                name: None,
                 title: None,
                 team: match (args.scope.team, args.scope.personal) {
                     (true, _) => Some(true),

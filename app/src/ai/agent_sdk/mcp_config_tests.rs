@@ -276,6 +276,7 @@ fn serializes_mcp_servers_as_object_not_string() {
             mcp_servers: Some(mcp_servers),
             ..Default::default()
         }),
+        name: None,
         title: None,
         team: None,
         agent_identity_uid: None,

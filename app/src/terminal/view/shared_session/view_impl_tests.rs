@@ -508,6 +508,7 @@ fn create_cloud_mode_task_for_user(creator_uid: &str) -> AmbientAgentTask {
     AmbientAgentTask {
         task_id: uuid::Uuid::new_v4().to_string().parse().unwrap(),
         parent_run_id: None,
+        name: None,
         title: "Owned task".to_string(),
         state: AmbientAgentTaskState::Succeeded,
         prompt: "test".to_string(),

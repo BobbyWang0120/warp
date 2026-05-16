@@ -920,7 +920,7 @@ impl AgentDriverRunner {
         };
 
         let task_id = match server_api
-            .create_agent_task(prompt, environment, None, task_config)
+            .create_agent_task(prompt, environment, None, None, task_config)
             .await
         {
             Ok(id) => {

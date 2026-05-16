@@ -1085,6 +1085,7 @@ fn cloud_mode_dispatched_agent_inserts_queued_user_query() {
                             prompt: "write the tests".to_string(),
                             mode: UserQueryMode::Normal,
                             config: None,
+                            name: None,
                             title: None,
                             team: None,
                             agent_identity_uid: None,

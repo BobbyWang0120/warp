@@ -42,6 +42,11 @@ pub struct CreateAgentTaskInput {
     pub environment_uid: Option<cynic::Id>,
     #[cynic(skip_serializing_if = "Option::is_none")]
     pub parent_run_id: Option<cynic::Id>,
+    /// Short orchestrator-supplied display label for the child agent.
+    /// Distinct from any prompt-derived `title`; optional so older orchestrator
+    /// flows that don't supply a name keep working.
+    #[cynic(skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
     #[cynic(skip_serializing_if = "Option::is_none")]
     pub agent_config_snapshot: Option<String>,
 }

@@ -209,6 +209,11 @@ pub struct SpawnAgentRequest {
     pub mode: UserQueryMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<AgentConfigSnapshot>,
+    /// Short orchestrator-supplied display label for the child agent (e.g. `"api"`).
+    /// Distinct from `title`, which is the descriptive run title used in details/search.
+    /// Optional and omitted when None so older servers ignore it cleanly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -909,11 +914,17 @@ pub trait AIClient: 'static + Send + Sync {
         request_ids: Vec<String>,
     ) -> anyhow::Result<i32, anyhow::Error>;
 
+    /// Create an agent task on the server.
+    ///
+    /// `agent_name` is the short orchestrator-supplied display label for child
+    /// agents (e.g. `"frontend-tests"`). It is distinct from any prompt-derived
+    /// or skill-derived `title`. Pass `None` for non-orchestration callers.
     async fn create_agent_task(
         &self,
         prompt: String,
         environment_uid: Option<String>,
         parent_run_id: Option<String>,
+        agent_name: Option<String>,
         config: Option<AgentConfigSnapshot>,
     ) -> anyhow::Result<AmbientAgentTaskId, anyhow::Error>;
 
@@ -1624,6 +1635,7 @@ impl AIClient for ServerApi {
         prompt: String,
         environment_uid: Option<String>,
         parent_run_id: Option<String>,
+        agent_name: Option<String>,
         config: Option<AgentConfigSnapshot>,
     ) -> anyhow::Result<AmbientAgentTaskId, anyhow::Error> {
         // Serialize the config to JSON if provided
@@ -1632,11 +1644,20 @@ impl AIClient for ServerApi {
             .transpose()
             .map_err(|e| anyhow!("Failed to serialize agent config: {e}"))?;
 
+        // Trim and discard empty/whitespace-only names so the server stores
+        // NULL rather than an empty string. Matches the public REST API's
+        // normalization in `enqueueAgentRun` so both creation paths agree.
+        let agent_name = agent_name.and_then(|name| {
+            let trimmed = name.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        });
+
         let variables = CreateAgentTaskVariables {
             input: CreateAgentTaskInput {
                 prompt,
                 environment_uid: environment_uid.map(|uid| uid.into()),
                 parent_run_id: parent_run_id.map(|run_id| run_id.into()),
+                agent_name,
                 agent_config_snapshot,
             },
             request_context: get_request_context(),

@@ -54,6 +54,7 @@ fn create_test_task(
     AmbientAgentTask {
         task_id: task_id.parse().unwrap(),
         parent_run_id: None,
+        name: None,
         title: format!("Task {task_id}"),
         state: AmbientAgentTaskState::Succeeded,
         prompt: "test".to_string(),

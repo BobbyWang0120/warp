@@ -165,6 +165,7 @@ fn ambient_agent_task(
     AmbientAgentTask {
         task_id,
         parent_run_id: None,
+        name: None,
         title: "Task".to_string(),
         state,
         prompt: "test".to_string(),

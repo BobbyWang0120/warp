@@ -297,11 +297,11 @@ impl OrchestrationViewerModel {
                 continue;
             };
 
-            let name = if task.title.is_empty() {
-                "Agent".to_string()
-            } else {
-                task.title.clone()
-            };
+            // Prefer the orchestrator-supplied short name for the agent label
+            // (`AIConversation::agent_name`). Falls back to `title` then to
+            // `"Agent"` via `display_name()` so older server responses without
+            // `name` still get a usable label.
+            let name = task.display_name().to_string();
             let harness = task
                 .agent_config_snapshot
                 .as_ref()
@@ -309,6 +309,12 @@ impl OrchestrationViewerModel {
                 .map(|h| h.harness_type);
             let terminal_view_id = self.terminal_view_id;
             let status_for_initial = conversation_status.clone();
+            // Capture the descriptive title separately. We seed it as the
+            // conversation's `fallback_display_title` so hover-cards and other
+            // long-title surfaces still have the descriptive run title to fall
+            // back on when nothing else (initial query, task description) is
+            // present.
+            let fallback_title = task.title.clone();
 
             let conversation_id = history_handle.update(ctx, |history, ctx| {
                 let conversation_id = history.start_new_child_conversation(
@@ -323,6 +329,9 @@ impl OrchestrationViewerModel {
                 history.set_viewing_shared_session_for_conversation(conversation_id, true);
                 if let Some(conversation) = history.conversation_mut(&conversation_id) {
                     conversation.set_task_id(task_id);
+                    if !fallback_title.is_empty() {
+                        conversation.set_fallback_display_title(fallback_title);
+                    }
                 }
                 history.update_conversation_status(
                     terminal_view_id,

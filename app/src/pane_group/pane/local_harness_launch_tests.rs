@@ -176,13 +176,14 @@ async fn prepare_local_codex_child_launch_does_not_rewrite_global_codex_state() 
     ai_client
         .expect_create_agent_task()
         .times(1)
-        .returning(|_, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
+        .returning(|_, _, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
 
     let prepared = prepare_local_harness_child_launch(
         "hello world".to_string(),
         "codex".to_string(),
         None,
         Some("parent-run".to_string()),
+        None,
         Some(ShellType::Zsh),
         Some(working_dir),
         Arc::new(ai_client),
@@ -214,13 +215,14 @@ async fn prepare_local_claude_child_merges_anthropic_model_env_var() {
     ai_client
         .expect_create_agent_task()
         .times(1)
-        .returning(|_, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
+        .returning(|_, _, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
 
     let prepared = prepare_local_harness_child_launch(
         "hello world".to_string(),
         "claude".to_string(),
         Some("opus".to_string()),
         Some("parent-run".to_string()),
+        None,
         Some(ShellType::Zsh),
         Some(working_dir),
         Arc::new(ai_client),
@@ -251,13 +253,14 @@ async fn prepare_local_claude_child_no_anthropic_model_when_empty() {
     ai_client
         .expect_create_agent_task()
         .times(1)
-        .returning(|_, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
+        .returning(|_, _, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
 
     let prepared = prepare_local_harness_child_launch(
         "hello world".to_string(),
         "claude".to_string(),
         None,
         Some("parent-run".to_string()),
+        None,
         Some(ShellType::Zsh),
         Some(working_dir),
         Arc::new(ai_client),
@@ -280,6 +283,7 @@ async fn prepare_local_harness_child_launch_rejects_disabled_claude_before_shell
         Some("parent-run".to_string()),
         None,
         None,
+        None,
         ai_client,
     )
     .await;
@@ -291,4 +295,84 @@ async fn prepare_local_harness_child_launch_rejects_disabled_claude_before_shell
             "Local Claude Code child agents are temporarily disabled."
         ),
     }
+}
+
+/// QUALITY-731 round trip: the orchestrator-supplied short name must be
+/// forwarded into `AIClient::create_agent_task` as the `agent_name` argument so
+/// the server persists it on the local-harness child's task record. Without
+/// this thread-through, viewers would only see the short label for remote
+/// (`SpawnAgentRequest`) children and fall back to `title` for local-harness
+/// children.
+#[tokio::test]
+#[serial_test::serial]
+async fn prepare_local_codex_child_forwards_agent_name_to_create_agent_task() {
+    let _local_harnesses = FeatureFlag::LocalClaudeCodexChildHarnesses.override_enabled(true);
+    let fake_home = TempDir::new().unwrap();
+    let fake_bin_dir = TempDir::new().unwrap();
+    let working_dir = fake_home.path().join("workspace");
+    fs::create_dir_all(&working_dir).unwrap();
+    write_fake_cli(fake_bin_dir.path(), "codex");
+
+    let _home = EnvVarGuard::set("HOME", fake_home.path().as_os_str().to_os_string());
+    let _path = EnvVarGuard::set("PATH", fake_bin_dir.path().as_os_str().to_os_string());
+
+    let mut ai_client = MockAIClient::new();
+    ai_client
+        .expect_create_agent_task()
+        .withf(|_prompt, _env, _parent, agent_name, _config| {
+            agent_name.as_deref() == Some("frontend-tests")
+        })
+        .times(1)
+        .returning(|_, _, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
+
+    prepare_local_harness_child_launch(
+        "hello world".to_string(),
+        "codex".to_string(),
+        None,
+        Some("parent-run".to_string()),
+        Some("frontend-tests".to_string()),
+        Some(ShellType::Zsh),
+        Some(working_dir),
+        Arc::new(ai_client),
+    )
+    .await
+    .unwrap();
+}
+
+/// Callers that don't have an orchestrator-supplied short name (e.g. local
+/// runs that never went through `run_agents`) must keep passing `None` through
+/// to `create_agent_task` so the server stores NULL rather than an empty
+/// string. The withf predicate would fail if `None` were silently rewritten.
+#[tokio::test]
+#[serial_test::serial]
+async fn prepare_local_codex_child_passes_none_agent_name_when_unset() {
+    let _local_harnesses = FeatureFlag::LocalClaudeCodexChildHarnesses.override_enabled(true);
+    let fake_home = TempDir::new().unwrap();
+    let fake_bin_dir = TempDir::new().unwrap();
+    let working_dir = fake_home.path().join("workspace");
+    fs::create_dir_all(&working_dir).unwrap();
+    write_fake_cli(fake_bin_dir.path(), "codex");
+
+    let _home = EnvVarGuard::set("HOME", fake_home.path().as_os_str().to_os_string());
+    let _path = EnvVarGuard::set("PATH", fake_bin_dir.path().as_os_str().to_os_string());
+
+    let mut ai_client = MockAIClient::new();
+    ai_client
+        .expect_create_agent_task()
+        .withf(|_prompt, _env, _parent, agent_name, _config| agent_name.is_none())
+        .times(1)
+        .returning(|_, _, _, _, _| Ok("550e8400-e29b-41d4-a716-446655440000".parse().unwrap()));
+
+    prepare_local_harness_child_launch(
+        "hello world".to_string(),
+        "codex".to_string(),
+        None,
+        Some("parent-run".to_string()),
+        None,
+        Some(ShellType::Zsh),
+        Some(working_dir),
+        Arc::new(ai_client),
+    )
+    .await
+    .unwrap();
 }

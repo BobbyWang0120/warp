@@ -40,6 +40,7 @@ fn spawn_agent_request_serializes_agent_uid_as_agent_identity_uid() {
         prompt: "hello".to_string(),
         mode: UserQueryMode::Normal,
         config: None,
+        name: None,
         title: None,
         team: None,
         agent_identity_uid: Some("agent_123".to_string()),
@@ -61,6 +62,74 @@ fn spawn_agent_request_serializes_agent_uid_as_agent_identity_uid() {
         Some("agent_123")
     );
     assert!(value.get("agent_uid").is_none());
+}
+
+/// QUALITY-731: when the orchestrator supplies a short agent name, it must be
+/// serialized as the public-API JSON field `name` so the server can persist it
+/// on the task record and return it from `GET /agent/runs`.
+#[test]
+fn spawn_agent_request_serializes_name_when_present() {
+    let request = SpawnAgentRequest {
+        prompt: "hello".to_string(),
+        mode: UserQueryMode::Normal,
+        config: None,
+        name: Some("frontend-tests".to_string()),
+        title: Some("Implement the frontend tests refactor".to_string()),
+        team: None,
+        agent_identity_uid: None,
+        skill: None,
+        attachments: vec![],
+        interactive: None,
+        parent_run_id: None,
+        runtime_skills: vec![],
+        referenced_attachments: vec![],
+        conversation_id: None,
+        initial_snapshot_token: None,
+        snapshot_disabled: None,
+    };
+
+    let value = serde_json::to_value(&request).unwrap();
+
+    assert_eq!(
+        value.get("name").and_then(|v| v.as_str()),
+        Some("frontend-tests"),
+    );
+    assert_eq!(
+        value.get("title").and_then(|v| v.as_str()),
+        Some("Implement the frontend tests refactor"),
+    );
+}
+
+/// QUALITY-731: when no orchestrator-supplied name is set, the JSON `name`
+/// field must be omitted entirely so older servers (and clients reading the
+/// response) keep working under the existing wire contract.
+#[test]
+fn spawn_agent_request_omits_name_when_none() {
+    let request = SpawnAgentRequest {
+        prompt: "hello".to_string(),
+        mode: UserQueryMode::Normal,
+        config: None,
+        name: None,
+        title: Some("Descriptive title only".to_string()),
+        team: None,
+        agent_identity_uid: None,
+        skill: None,
+        attachments: vec![],
+        interactive: None,
+        parent_run_id: None,
+        runtime_skills: vec![],
+        referenced_attachments: vec![],
+        conversation_id: None,
+        initial_snapshot_token: None,
+        snapshot_disabled: None,
+    };
+
+    let value = serde_json::to_value(&request).unwrap();
+
+    assert!(
+        value.get("name").is_none(),
+        "absent `name` must be skipped (not serialized as null) so older servers ignore it cleanly",
+    );
 }
 
 #[test]

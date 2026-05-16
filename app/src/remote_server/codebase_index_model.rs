@@ -149,7 +149,11 @@ impl RemoteCodebaseIndexModel {
         };
 
         RemoteServerManager::handle(ctx).update(ctx, |manager, ctx| {
-            manager.ensure_codebase_indexed(remote_path, RemoteCodebaseIndexMutationKind::Request, ctx);
+            manager.ensure_codebase_indexed(
+                remote_path,
+                RemoteCodebaseIndexMutationKind::Request,
+                ctx,
+            );
         });
         true
     }
@@ -175,7 +179,11 @@ impl RemoteCodebaseIndexModel {
 
     pub fn request_index(&self, remote_path: RemotePath, ctx: &mut ModelContext<Self>) {
         RemoteServerManager::handle(ctx).update(ctx, |manager, ctx| {
-            manager.ensure_codebase_indexed(remote_path, RemoteCodebaseIndexMutationKind::Request, ctx);
+            manager.ensure_codebase_indexed(
+                remote_path,
+                RemoteCodebaseIndexMutationKind::Request,
+                ctx,
+            );
         });
     }
 
@@ -246,7 +254,11 @@ impl RemoteCodebaseIndexModel {
                     // only when the shared auto-index setting allows it.
                     let remote_path = remote_path.clone();
                     RemoteServerManager::handle(ctx).update(ctx, |manager, ctx| {
-                        manager.ensure_codebase_indexed(remote_path, RemoteCodebaseIndexMutationKind::AutoIndex, ctx);
+                        manager.ensure_codebase_indexed(
+                            remote_path,
+                            RemoteCodebaseIndexMutationKind::AutoIndex,
+                            ctx,
+                        );
                     });
                 }
             }

@@ -8,7 +8,9 @@ use warpui::App;
 
 use super::super::diff_state_tracker::RemoteDiffStateManager;
 
-use super::super::proto::{Authenticate, Initialize};
+use super::super::proto::{
+    Authenticate, CodebaseIndexStatus, CodebaseIndexStatusState, Initialize,
+};
 use super::super::server_buffer_tracker::ServerBufferTracker;
 use super::{PendingFileOps, ServerModel};
 
@@ -24,6 +26,24 @@ fn test_model(app: &mut App) -> ServerModel {
         auth_state: Arc::new(AuthState::new_logged_out_for_test()),
         buffers: ServerBufferTracker::new(),
         diff_states: app.add_model(|_| RemoteDiffStateManager::new()),
+        last_pushed_codebase_index_statuses: HashMap::new(),
+    }
+}
+
+fn codebase_index_status(
+    repo_path: &str,
+    state: CodebaseIndexStatusState,
+    last_updated_epoch_millis: u64,
+) -> CodebaseIndexStatus {
+    CodebaseIndexStatus {
+        repo_path: repo_path.to_string(),
+        state: state.into(),
+        last_updated_epoch_millis: Some(last_updated_epoch_millis),
+        progress_completed: None,
+        progress_total: None,
+        failure_message: None,
+        root_hash: Some("root-hash".to_string()),
+        embedding_config: Some(4),
     }
 }
 
@@ -177,5 +197,35 @@ fn diff_states_starts_empty() {
             mgr.subscribed_connections(&key).is_empty()
         });
         assert!(empty);
+    });
+}
+
+#[test]
+fn codebase_index_status_push_dedupe_ignores_last_updated_timestamp() {
+    App::test((), |mut app| async move {
+        let mut model = test_model(&mut app);
+        let first_status = codebase_index_status("/repo", CodebaseIndexStatusState::Stale, 1000);
+        let duplicate_status =
+            codebase_index_status("/repo", CodebaseIndexStatusState::Stale, 2000);
+
+        assert!(model.record_codebase_index_status_push(&first_status));
+        assert!(!model.record_codebase_index_status_push(&duplicate_status));
+    });
+}
+
+#[test]
+fn codebase_index_status_push_dedupe_allows_semantic_changes() {
+    App::test((), |mut app| async move {
+        let mut model = test_model(&mut app);
+        let stale_status = codebase_index_status("/repo", CodebaseIndexStatusState::Stale, 1000);
+        let mut ready_status =
+            codebase_index_status("/repo", CodebaseIndexStatusState::Ready, 1001);
+
+        assert!(model.record_codebase_index_status_push(&stale_status));
+        assert!(model.record_codebase_index_status_push(&ready_status));
+
+        ready_status.progress_completed = Some(1);
+        ready_status.progress_total = Some(1);
+        assert!(model.record_codebase_index_status_push(&ready_status));
     });
 }

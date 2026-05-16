@@ -2485,7 +2485,8 @@ pub enum TelemetryEvent {
         mutation_kind: remote_server::manager::RemoteCodebaseIndexMutationKind,
         state: Option<remote_server::codebase_index_proto::RemoteCodebaseIndexState>,
         error_type: Option<remote_server::manager::RemoteServerErrorKind>,
-        embedding_config: Option<remote_server::codebase_index_proto::RemoteCodebaseEmbeddingConfig>,
+        embedding_config:
+            Option<remote_server::codebase_index_proto::RemoteCodebaseEmbeddingConfig>,
         remote_os: Option<String>,
         remote_arch: Option<String>,
     },

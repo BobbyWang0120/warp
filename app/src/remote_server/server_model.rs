@@ -111,6 +111,26 @@ struct CodebaseIndexRequestParams<'a> {
     auth_operation: &'a str,
     path_kind: CodebaseIndexRequestPathKind,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CodebaseIndexStatusPushKey {
+    state: i32,
+    progress_completed: Option<u64>,
+    progress_total: Option<u64>,
+    failure_message: Option<String>,
+    root_hash: Option<String>,
+}
+
+impl From<&CodebaseIndexStatus> for CodebaseIndexStatusPushKey {
+    fn from(status: &CodebaseIndexStatus) -> Self {
+        Self {
+            state: status.state,
+            progress_completed: status.progress_completed,
+            progress_total: status.progress_total,
+            failure_message: status.failure_message.clone(),
+            root_hash: status.root_hash.clone(),
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum CodebaseIndexRequestPathKind {
@@ -229,6 +249,15 @@ pub struct ServerModel {
     buffers: ServerBufferTracker,
     /// Manages per-(repo, mode) diff state models and per-connection subscriptions.
     diff_states: ModelHandle<RemoteDiffStateManager>,
+    /// Last remote codebase index status sent through the server protocol.
+    ///
+    /// The local index manager can emit several internal events for one
+    /// externally-visible status change. For example, finishing an incremental
+    /// sync can update sync state, persist index metadata, and then update sync
+    /// state again, while all three events serialize to the same remote
+    /// `Stale` status. This cache keeps that internal event fan-out from
+    /// becoming duplicate remote pushes.
+    last_pushed_codebase_index_statuses: HashMap<String, CodebaseIndexStatusPushKey>,
 }
 
 impl Entity for ServerModel {
@@ -256,6 +285,7 @@ impl ServerModel {
             auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             buffers: ServerBufferTracker::new(),
             diff_states: ctx.add_model(|_| RemoteDiffStateManager::new()),
+            last_pushed_codebase_index_statuses: HashMap::new(),
         };
         // Subscribe to FileModel and RepoMetadataModel events
         // file operation results and repo metadata pushes are forwarded to all
@@ -797,28 +827,26 @@ impl ServerModel {
             }
             CodebaseIndexManagerEvent::RemoveExpiredIndexMetadata { expired_metadata } => {
                 for repo_path in expired_metadata.iter() {
-                    self.send_server_message(
-                        None,
-                        None,
-                        server_message::Message::CodebaseIndexStatusUpdated(
-                            CodebaseIndexStatusUpdated {
-                                status: Some(disabled_codebase_index_status(
-                                    repo_path.to_string_lossy().to_string(),
-                                )),
-                            },
-                        ),
-                    );
+                    self.push_codebase_index_status_update(disabled_codebase_index_status(
+                        repo_path.to_string_lossy().to_string(),
+                    ));
                 }
             }
             CodebaseIndexManagerEvent::RetrievalRequestCompleted { .. }
             | CodebaseIndexManagerEvent::RetrievalRequestFailed { .. } => {}
         }
     }
-
-    fn push_codebase_index_status(&self, repo_path: &Path, ctx: &mut ModelContext<Self>) {
+    fn push_codebase_index_status(&mut self, repo_path: &Path, ctx: &mut ModelContext<Self>) {
         let Some(status) = self.codebase_index_status(repo_path, ctx) else {
             return;
         };
+        self.push_codebase_index_status_update(status);
+    }
+
+    fn push_codebase_index_status_update(&mut self, status: CodebaseIndexStatus) {
+        if !self.record_codebase_index_status_push(&status) {
+            return;
+        }
         self.send_server_message(
             None,
             None,
@@ -827,9 +855,26 @@ impl ServerModel {
             }),
         );
     }
+    fn record_codebase_index_status_push(&mut self, status: &CodebaseIndexStatus) -> bool {
+        // `last_updated_epoch_millis` is intentionally not part of this key:
+        // it is generated while serializing the current status, so including it
+        // would turn semantically identical status pushes into apparent changes.
+        let key = CodebaseIndexStatusPushKey::from(status);
+        match self
+            .last_pushed_codebase_index_statuses
+            .get(&status.repo_path)
+        {
+            Some(previous_key) if previous_key == &key => false,
+            Some(_) | None => {
+                self.last_pushed_codebase_index_statuses
+                    .insert(status.repo_path.clone(), key);
+                true
+            }
+        }
+    }
 
     fn push_codebase_index_statuses_snapshot(
-        &self,
+        &mut self,
         conn_id: ConnectionId,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -841,6 +886,9 @@ impl ServerModel {
         }
         let snapshot = self.codebase_index_statuses_snapshot(ctx);
         let status_count = snapshot.statuses.len();
+        for status in &snapshot.statuses {
+            self.record_codebase_index_status_push(status);
+        }
         log::info!(
             "[Remote codebase indexing] Daemon pushing bootstrap codebase index statuses snapshot: conn_id={conn_id} bootstrap_status_count={status_count}"
         );

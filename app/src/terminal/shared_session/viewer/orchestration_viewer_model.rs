@@ -297,10 +297,6 @@ impl OrchestrationViewerModel {
                 continue;
             };
 
-            // Prefer the orchestrator-supplied short name for the agent label
-            // (`AIConversation::agent_name`). Falls back to `title` then to
-            // `"Agent"` via `display_name()` so older server responses without
-            // `name` still get a usable label.
             let name = task.display_name().to_string();
             let harness = task
                 .agent_config_snapshot
@@ -309,11 +305,9 @@ impl OrchestrationViewerModel {
                 .map(|h| h.harness_type);
             let terminal_view_id = self.terminal_view_id;
             let status_for_initial = conversation_status.clone();
-            // Capture the descriptive title separately. We seed it as the
-            // conversation's `fallback_display_title` so hover-cards and other
-            // long-title surfaces still have the descriptive run title to fall
-            // back on when nothing else (initial query, task description) is
-            // present.
+            // Seed the descriptive title as `fallback_display_title` so
+            // `AIConversation::title()` can fall back to it when no initial
+            // query or task description is available.
             let fallback_title = task.title.clone();
 
             let conversation_id = history_handle.update(ctx, |history, ctx| {

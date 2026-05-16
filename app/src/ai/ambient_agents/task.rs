@@ -235,16 +235,9 @@ pub struct AmbientAgentTask {
     pub task_id: AmbientAgentTaskId,
     #[serde(default)]
     pub parent_run_id: Option<String>,
-    /// Optional short orchestrator-supplied display label for the agent
-    /// (e.g. `"frontend-tests"`).
-    ///
-    /// Distinct from `title`, which is the descriptive run title derived by the
-    /// server from explicit title/skill/prompt/UUID. `name` is the source of
-    /// truth for short label surfaces (pills, hover cards, transcript
-    /// participant labels). Old server responses without this field deserialize
-    /// to `None` via `#[serde(default)]`; clients must fall back to `title`.
-    ///
-    /// See `display_name()` for the canonical lookup.
+    /// Optional short orchestrator-supplied display label (e.g. `"frontend-tests"`).
+    /// `title` remains the descriptive run title. See [`Self::display_name`] for
+    /// the canonical lookup with fallback to `title`.
     #[serde(default)]
     pub name: Option<String>,
     pub title: String,

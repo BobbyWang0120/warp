@@ -603,9 +603,7 @@ impl AmbientAgentViewModel {
             prompt,
             mode,
             config,
-            // Handoff flows promote an existing conversation into a fresh
-            // cloud run; there's no orchestrator-supplied short name in that
-            // path, so leave it unset and rely on `title` for fallback labels.
+            // Handoff flows have no orchestrator-supplied short name.
             name: None,
             title: self.pending_handoff.as_ref().and_then(|h| h.title.clone()),
             team: None,
@@ -1039,8 +1037,7 @@ impl AmbientAgentViewModel {
             prompt,
             mode,
             config,
-            // Standalone cloud-mode spawns from this pane are not orchestrator
-            // children; no short name is supplied here.
+            // Standalone cloud-mode spawns are not orchestrator children.
             name: None,
             title: None,
             team: None,

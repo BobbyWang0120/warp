@@ -79,14 +79,8 @@ fn local_child_task_config(harness: Harness) -> Option<AgentConfigSnapshot> {
 }
 
 /// Prepares the command, env vars, and server-side task record needed to launch
-/// a local harness child agent.
-///
-/// `agent_name` is the orchestrator-supplied short display label for this child
-/// (e.g. `"frontend-tests"`). It is threaded into
-/// [`AIClient::create_agent_task`] so the server persists it as `agent_name` on
-/// the task record and shared-session viewers can render the short label for
-/// local harness children, not just remote ones. Pass `None` for callers that
-/// do not supply a name.
+/// a local harness child agent. `agent_name` is the orchestrator-supplied short
+/// label forwarded onto [`AIClient::create_agent_task`]; `None` when unset.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn prepare_local_harness_child_launch(
     prompt: String,

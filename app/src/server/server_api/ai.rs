@@ -209,9 +209,8 @@ pub struct SpawnAgentRequest {
     pub mode: UserQueryMode,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub config: Option<AgentConfigSnapshot>,
-    /// Short orchestrator-supplied display label for the child agent (e.g. `"api"`).
-    /// Distinct from `title`, which is the descriptive run title used in details/search.
-    /// Optional and omitted when None so older servers ignore it cleanly.
+    /// Short orchestrator-supplied display label (e.g. `"api"`); see
+    /// [`AmbientAgentTask::name`] for the inbound counterpart.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -914,11 +913,9 @@ pub trait AIClient: 'static + Send + Sync {
         request_ids: Vec<String>,
     ) -> anyhow::Result<i32, anyhow::Error>;
 
-    /// Create an agent task on the server.
-    ///
-    /// `agent_name` is the short orchestrator-supplied display label for child
-    /// agents (e.g. `"frontend-tests"`). It is distinct from any prompt-derived
-    /// or skill-derived `title`. Pass `None` for non-orchestration callers.
+    /// Create an agent task on the server. `agent_name` is the optional
+    /// orchestrator-supplied short label; pass `None` for non-orchestration
+    /// callers.
     async fn create_agent_task(
         &self,
         prompt: String,
@@ -1644,9 +1641,8 @@ impl AIClient for ServerApi {
             .transpose()
             .map_err(|e| anyhow!("Failed to serialize agent config: {e}"))?;
 
-        // Trim and discard empty/whitespace-only names so the server stores
-        // NULL rather than an empty string. Matches the public REST API's
-        // normalization in `enqueueAgentRun` so both creation paths agree.
+        // Canonical outbound trim for the GraphQL channel; empty → None so the
+        // server stores NULL rather than an empty string.
         let agent_name = agent_name.and_then(|name| {
             let trimmed = name.trim();
             (!trimmed.is_empty()).then(|| trimmed.to_string())

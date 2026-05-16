@@ -88,6 +88,10 @@ pub(super) fn send_request(
         RemoteCodebaseSearchAvailability::Ready(search_context) => {
             if search_context.is_stale {
                 let remote_path = search_context.remote_path.clone();
+                log::debug!(
+                    "[Remote codebase indexing] Remote search triggering incremental sync for stale index: repo_path={}",
+                    remote_path.path.as_str()
+                );
                 remote_server::manager::RemoteServerManager::handle(ctx).update(
                     ctx,
                     |manager, ctx| {
@@ -233,7 +237,7 @@ async fn execute_remote_codebase_search_inner(
     let root_hash = search_context.root_hash;
     let root_hash_string = root_hash.to_string();
     let repo_path = search_context.remote_path.path.as_str().to_string();
-    log::info!(
+    log::debug!(
         "[Remote codebase indexing] Remote codebase search using embedding config: repo_path={repo_path} embedding_config={embedding_config:?}"
     );
     let candidate_hashes = store_client
